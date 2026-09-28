@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.Core", "Masaryk.Core\Masaryk.Core.fsproj", "{E09EFFAE-C318-4F11-BA9C-0EE4CF969DD0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{079992C6-FDD4-46A0-BDD0-189C219082F3}"
+	ProjectSection(SolutionItems) = preProject
+		compose.yaml = compose.yaml
+		.env = .env
+	EndProjectSection
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.Postgres", "Masaryk.Postgres\Masaryk.Postgres.fsproj", "{49D2B35C-DA17-4A72-9D7A-74F0FE8942B9}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.Postgres.Migrator", "Masaryk.Postgres.Migrator\Masaryk.Postgres.Migrator.fsproj", "{38F1DA0D-1D07-4298-8648-7756B8C69ED3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E09EFFAE-C318-4F11-BA9C-0EE4CF969DD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E09EFFAE-C318-4F11-BA9C-0EE4CF969DD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E09EFFAE-C318-4F11-BA9C-0EE4CF969DD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E09EFFAE-C318-4F11-BA9C-0EE4CF969DD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49D2B35C-DA17-4A72-9D7A-74F0FE8942B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49D2B35C-DA17-4A72-9D7A-74F0FE8942B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49D2B35C-DA17-4A72-9D7A-74F0FE8942B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49D2B35C-DA17-4A72-9D7A-74F0FE8942B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38F1DA0D-1D07-4298-8648-7756B8C69ED3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38F1DA0D-1D07-4298-8648-7756B8C69ED3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38F1DA0D-1D07-4298-8648-7756B8C69ED3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38F1DA0D-1D07-4298-8648-7756B8C69ED3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
