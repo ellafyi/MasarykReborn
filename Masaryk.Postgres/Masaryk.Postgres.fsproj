@@ -7,10 +7,13 @@
 
     <ItemGroup>
         <Compile Include="Library.fs"/>
+        <Compile Include="Starboard.fs"/>
+        <Compile Include="StarboardRepository.fs"/>
     </ItemGroup>
 
     <ItemGroup>
         <EmbeddedResource Include="Migrations/001_initial_schema.sql" />
+        <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 
 </Project>

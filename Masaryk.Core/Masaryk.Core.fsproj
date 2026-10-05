@@ -9,9 +9,12 @@
     <ItemGroup>
         <Compile Include="Starboard\Domain.fs"/>
         <Compile Include="Starboard\Evaluation.fs"/>
+        <Compile Include="Starboard\Configuration.fs"/>
+        <Compile Include="Starboard\Runtime.fs"/>
         <Compile Include="Command.fs"/>
         <Compile Include="Commands\Cummy.fs"/>
         <Compile Include="Commands\Test.fs"/>
+        <Compile Include="Commands\Starboard.fs"/>
         <Compile Include="CommandRegistry.fs"/>
     </ItemGroup>
 
@@ -25,6 +28,7 @@
 
     <ItemGroup>
         <PackageReference Include="Discord.Net" Version="3.20.1"/>
+        <ProjectReference Include="..\Masaryk.Postgres\Masaryk.Postgres.fsproj"/>
     </ItemGroup>
 
 </Project>

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+files=()
+while IFS= read -r -d '' file; do
+    files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.fs' '*.fsi' '*.fsx')
+
+if (( ${#files[@]} )); then
+    if ! git diff --quiet -- "${files[@]}"; then
+        echo "Stage the complete F# files before committing; the formatter cannot handle partial staging." >&2
+        exit 1
+    fi
+    dotnet fantomas "${files[@]}"
+fi
+
+dotnet build Masaryk.sln --nologo
+
+if (( ${#files[@]} )) && ! git diff --quiet -- "${files[@]}"; then
+    echo "Fantomas changed files. Review and stage the formatting, then commit again." >&2
+    exit 1
+fi

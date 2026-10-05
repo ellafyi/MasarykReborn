@@ -1,21 +1,27 @@
 CREATE DOMAIN discord_snowflake AS numeric(20, 0);
 
+CREATE TABLE starboard_configuration
+(
+    guild_id      discord_snowflake PRIMARY KEY,
+    configuration jsonb NOT NULL DEFAULT '[]'::jsonb
+);
+
 CREATE TABLE starboard
 (
     id                     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    destination_channel_id discord_snowflake NOT NULL UNIQUE,
+    guild_id               discord_snowflake NOT NULL,
+    name                   text NOT NULL,
+    destination_channel_id discord_snowflake NOT NULL,
     reaction_threshold     integer           NOT NULL CHECK (reaction_threshold > 0),
     is_active              boolean           NOT NULL DEFAULT true,
-    created_at             timestamptz       NOT NULL DEFAULT now()
+    created_at             timestamptz       NOT NULL DEFAULT now(),
+    UNIQUE (guild_id, name)
 );
 
 CREATE TABLE source_channel
 (
-    discord_channel_id discord_snowflake PRIMARY KEY,
-    starboard_id       bigint      REFERENCES starboard (id) ON DELETE SET NULL,
-    updated_at         timestamptz NOT NULL DEFAULT now()
+    discord_channel_id discord_snowflake PRIMARY KEY
 );
-CREATE INDEX source_channel_starboard_idx ON source_channel (starboard_id);
 
 CREATE TABLE starboard_entry
 (

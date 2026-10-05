@@ -7,11 +7,22 @@ type EmojiKey =
 
 type Emoji = { Key: EmojiKey; DisplayName: string }
 
-type Board =
-    { Id: int64
-      DestinationChannelId: uint64
-      Threshold: int
-      IsActive: bool }
+[<RequireQualifiedAccess>]
+type SourceMode =
+    | Whitelist
+    | Blacklist
+
+type BoardSettings =
+    {
+        Name: string
+        Mode: SourceMode
+        Channels: Set<uint64>
+        Target: uint64
+        Threshold: int
+        IsActive: bool
+    }
+
+type Board = { Id: int64; Settings: BoardSettings }
 
 [<RequireQualifiedAccess>]
 type SourceChannel =

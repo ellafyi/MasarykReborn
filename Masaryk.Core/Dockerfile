@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Masaryk.Core/Masaryk.Core.fsproj", "Masaryk.Core/"]
+COPY ["Masaryk.Postgres/Masaryk.Postgres.fsproj", "Masaryk.Postgres/"]
 RUN dotnet restore "Masaryk.Core/Masaryk.Core.fsproj"
 COPY . .
 WORKDIR "/src/Masaryk.Core"

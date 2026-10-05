@@ -71,10 +71,12 @@ let connect commands =
 let main args =
     use database = Masaryk.Postgres.Database.fromEnvironment ()
     let repository = Masaryk.Postgres.StarboardRepository(database)
-    let managerRoleIds = Commands.Starboard.managerRolesFromEnvironment ()
+    use configuration = new Starboard.Runtime.ConfigurationStore(repository, guildId)
+    printfn $"%s{configuration.Reload().GetAwaiter().GetResult()}"
+    let managerRoleIds = Starboard.Configuration.managerRolesFromEnvironment ()
 
     let commands =
-        CommandRegistry.create (Commands.Starboard.command repository guildId managerRoleIds)
+        CommandRegistry.create (Commands.Starboard.command configuration guildId managerRoleIds)
 
     connect(commands).GetAwaiter().GetResult()
     0
