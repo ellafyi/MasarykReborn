@@ -17,12 +17,16 @@ let guildId =
 let log (message: LogMessage) : Task = task { printfn $"{message}" }
 
 let buildSlashCommand (input: Command) : SlashCommandProperties =
-    SlashCommandBuilder().WithName(input.Name).WithDescription(input.Description).Build()
+    SlashCommandBuilder()
+        .WithName(input.Name)
+        .WithDescription(input.Description)
+        .AddOptions(List.toArray input.Options)
+        .Build()
 
-let registerCommands (guild: SocketGuild) : Task =
+let registerCommands commands (guild: SocketGuild) : Task =
     task {
         let properties =
-            CommandRegistry.commands
+            commands
             |> List.map (fun command -> buildSlashCommand command :> ApplicationCommandProperties)
             |> List.toArray
 
@@ -30,26 +34,27 @@ let registerCommands (guild: SocketGuild) : Task =
         return ()
     }
 
-let clientReady () : Task =
+let clientReady commands () : Task =
     task {
         match client.GetGuild(guildId) with
         | null -> invalidOp $"Guild {guildId} was not found after the client became ready."
-        | guild -> do! registerCommands guild
+        | guild -> do! registerCommands commands guild
     }
 
 
-let slashCommandHandler (incomingCommand: SocketSlashCommand) : Task =
+let slashCommandHandler commandsByName (incomingCommand: SocketSlashCommand) : Task =
     task {
-        match Map.tryFind incomingCommand.CommandName CommandRegistry.commandsByName with
+        match Map.tryFind incomingCommand.CommandName commandsByName with
         | Some command -> do! command.Handle incomingCommand
         | None -> do! incomingCommand.RespondAsync("unknown command")
     }
 
-let connect () =
+let connect commands =
     task {
+        let commandsByName = CommandRegistry.byName commands
         client.add_Log (Func<LogMessage, Task>(log))
-        client.add_Ready (Func<Task>(clientReady))
-        client.add_SlashCommandExecuted (Func<SocketSlashCommand, Task>(slashCommandHandler))
+        client.add_Ready (Func<Task>(clientReady commands))
+        client.add_SlashCommandExecuted (Func<SocketSlashCommand, Task>(slashCommandHandler commandsByName))
 
         let token = Environment.GetEnvironmentVariable("BOT_TOKEN")
 
@@ -64,6 +69,12 @@ let connect () =
 
 [<EntryPoint>]
 let main args =
-    printfn "Hello, World!"
-    connect().GetAwaiter().GetResult()
+    use database = Masaryk.Postgres.Database.fromEnvironment ()
+    let repository = Masaryk.Postgres.StarboardRepository(database)
+    let managerRoleIds = Commands.Starboard.managerRolesFromEnvironment ()
+
+    let commands =
+        CommandRegistry.create (Commands.Starboard.command repository guildId managerRoleIds)
+
+    connect(commands).GetAwaiter().GetResult()
     0

@@ -2,9 +2,10 @@ module Masaryk.Core.CommandRegistry
 
 open Masaryk.Core
 
-let commands: Command list = [ Commands.Cummy.command; Commands.Test.command ]
+let create starboardCommand : Command list =
+    [ Commands.Cummy.command; Commands.Test.command; starboardCommand ]
 
-let commandsByName =
+let byName commands =
     commands
     |> List.countBy (fun command -> command.Name)
     |> List.tryFind (fun (_, count) -> count > 1)
