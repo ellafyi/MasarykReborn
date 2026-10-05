@@ -23,12 +23,14 @@ CREATE TABLE starboard_entry
     starboard_id         bigint            NOT NULL REFERENCES starboard (id),
     source_channel_id    discord_snowflake NOT NULL REFERENCES source_channel (discord_channel_id),
     source_message_id    discord_snowflake NOT NULL UNIQUE,
+    source_created_at    timestamptz       NOT NULL,
     archive_message_id   discord_snowflake UNIQUE,
     author_user_id       discord_snowflake,
     author_display_name  text              NOT NULL,
     content_snapshot     text              NOT NULL,
     source_jump_url      text              NOT NULL,
     qualifying_emoji_key text              NOT NULL,
+    qualifying_emoji_name text             NOT NULL,
     qualifying_count     integer           NOT NULL CHECK (qualifying_count > 0),
     archive_status       text              NOT NULL DEFAULT 'pending'
         CHECK (archive_status IN ('pending', 'failed', 'posted')),
@@ -42,6 +44,7 @@ CREATE TABLE entry_reaction
 (
     entry_id       bigint  NOT NULL REFERENCES starboard_entry (id) ON DELETE CASCADE,
     emoji_key      text    NOT NULL,
+    emoji_name     text    NOT NULL,
     count_snapshot integer NOT NULL CHECK (count_snapshot >= 0),
     PRIMARY KEY (entry_id, emoji_key)
 );
@@ -50,6 +53,7 @@ CREATE TABLE entry_attachment
     id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     entry_id   bigint  NOT NULL REFERENCES starboard_entry (id) ON DELETE CASCADE,
     position   integer NOT NULL CHECK (position >= 0),
+    discord_attachment_id discord_snowflake NOT NULL,
     filename   text    NOT NULL,
     url        text    NOT NULL,
     media_type text,
