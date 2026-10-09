@@ -6,19 +6,44 @@
       dockerfile: Masaryk.Core/Dockerfile
     env_file:
       - .env
+    environment:
+      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+    depends_on:
+      masaryk.migrator:
+        condition: service_completed_successfully
     networks:
       - postgres-network
-  
+
+  masaryk.migrator:
+    image: masaryk.migrator
+    build:
+      context: .
+      dockerfile: Masaryk.Postgres.Migrator/Dockerfile
+    environment:
+      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+    depends_on:
+      masaryk.db:
+        condition: service_healthy
+    networks:
+      - postgres-network
+
   masaryk.db:
     image: 'postgres:18-trixie'
     ports:
       - "15432:5432"
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-masaryk}
+      POSTGRES_DB: ${POSTGRES_DB:-masaryk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 15
     networks:
       - postgres-network
     volumes:
-      - ${PWD}/db-data/:/var/lib/postgresql/
+      - ./db-data:/var/lib/postgresql
 
 networks:
   postgres-network:
