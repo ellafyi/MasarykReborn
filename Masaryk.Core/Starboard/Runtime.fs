@@ -2,16 +2,17 @@ module Masaryk.Core.Starboard.Runtime
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Masaryk.Core.Starboard
 open Masaryk.Postgres
 
 type ConfigurationStore(repository: StarboardRepository, guildId: uint64) =
     let reload = new SemaphoreSlim(1, 1)
-    let mutable boards: Board list = []
+    let mutable boards = []
 
-    member _.Boards = Volatile.Read(&boards)
+    member _.Boards: Board list = Volatile.Read(&boards)
 
-    member _.Reload() =
+    member _.Reload() : Task<string> =
         task {
             do! reload.WaitAsync()
 
@@ -73,4 +74,4 @@ type ConfigurationStore(repository: StarboardRepository, guildId: uint64) =
         }
 
     interface IDisposable with
-        member _.Dispose() = reload.Dispose()
+        member _.Dispose() : unit = reload.Dispose()

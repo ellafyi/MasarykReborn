@@ -7,7 +7,7 @@ open Npgsql
 open Masaryk.Core
 open Masaryk.Core.Starboard
 
-let command (configuration: Runtime.ConfigurationStore) guildId (managerRoleIds: Set<uint64>) : Command =
+let command (configuration: Runtime.ConfigurationStore) (guildId: uint64) (managerRoleIds: Set<uint64>) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
             match interaction.User with

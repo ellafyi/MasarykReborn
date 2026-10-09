@@ -18,11 +18,11 @@ type JsonBoard =
         Active: Nullable<bool>
     }
 
-let private require condition message =
+let private require (condition: bool) (message: string) : unit =
     if not condition then
         raise (InvalidConfiguration message)
 
-let private validate (boards: BoardSettings list) =
+let private validate (boards: BoardSettings list) : unit =
     require (boards |> List.countBy _.Name |> List.forall (fun (_, count) -> count = 1)) "Board names must be unique."
 
     require
@@ -30,7 +30,7 @@ let private validate (boards: BoardSettings list) =
         "Each board must have a different target channel."
 
     let targets = boards |> List.map _.Target |> Set.ofList
-    let sources (board: BoardSettings) = Set.difference board.Channels targets
+    let sources (board: BoardSettings) : Set<uint64> = Set.difference board.Channels targets
 
     for index, left in List.indexed boards do
         for right in List.skip (index + 1) boards do
@@ -46,7 +46,7 @@ let private validate (boards: BoardSettings list) =
 
             require (not overlap) $"Source rules overlap between '{left.Name}' and '{right.Name}'."
 
-let parse (json: string) =
+let parse (json: string) : BoardSettings list =
     let options =
         JsonSerializerOptions(
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -93,7 +93,7 @@ let parse (json: string) =
     validate boards
     boards
 
-let parseManagerRoles (value: string) =
+let parseManagerRoles (value: string) : Set<uint64> =
     if String.IsNullOrWhiteSpace value then
         Set.empty
     else
@@ -104,6 +104,6 @@ let parseManagerRoles (value: string) =
             | _ -> invalidOp "STARBOARD_MANAGER_ROLE_IDS must contain comma-separated positive role IDs.")
         |> Set.ofArray
 
-let managerRolesFromEnvironment () =
+let managerRolesFromEnvironment () : Set<uint64> =
     Environment.GetEnvironmentVariable("STARBOARD_MANAGER_ROLE_IDS")
     |> parseManagerRoles

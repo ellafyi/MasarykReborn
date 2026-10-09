@@ -8,7 +8,7 @@ type Qualification =
         Reaction: QualifyingReaction
     }
 
-let resolveBoard (boards: Board list) source =
+let resolveBoard (boards: Board list) (source: SourceChannel) : Board option =
     let channelId =
         match source with
         | SourceChannel.Channel id -> id
@@ -25,14 +25,19 @@ let resolveBoard (boards: Board list) source =
             | SourceMode.Whitelist -> listed
             | SourceMode.Blacklist -> not listed)
 
-let eligibleCount authorId (reactors: Reactor seq) =
+let eligibleCount (authorId: uint64 option) (reactors: Reactor seq) : int =
     reactors
     |> Seq.filter (fun user -> not user.IsBot && Some user.UserId <> authorId)
     |> Seq.map _.UserId
     |> Seq.distinct
     |> Seq.length
 
-let qualifyingReaction threshold authorId preferredEmoji (reactions: ReactionObservation seq) =
+let qualifyingReaction
+    (threshold: int)
+    (authorId: uint64 option)
+    (preferredEmoji: EmojiKey option)
+    (reactions: ReactionObservation seq)
+    : QualifyingReaction option =
     let qualifying =
         reactions
         |> Seq.groupBy (fun reaction -> reaction.Emoji.Key)
@@ -51,7 +56,13 @@ let qualifyingReaction threshold authorId preferredEmoji (reactions: ReactionObs
     |> List.tryFind (fun reaction -> Some reaction.Emoji.Key = preferredEmoji)
     |> Option.orElseWith (fun () -> List.tryHead qualifying)
 
-let evaluate boards source authorId preferredEmoji reactions =
+let evaluate
+    (boards: Board list)
+    (source: SourceChannel)
+    (authorId: uint64 option)
+    (preferredEmoji: EmojiKey option)
+    (reactions: ReactionObservation seq)
+    : Qualification option =
     resolveBoard boards source
     |> Option.filter _.Settings.IsActive
     |> Option.bind (fun board ->

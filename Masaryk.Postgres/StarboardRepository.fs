@@ -1,21 +1,23 @@
 namespace Masaryk.Postgres
 
 open System
+open System.Data.Common
+open System.Threading.Tasks
 open Npgsql
 open Masaryk.Postgres.Starboard
 
 module private Sql =
     /// Box the value in Some, or use SQL NULL for None.
-    let optional value =
+    let optional (value: 'T option) : obj =
         value |> Option.map box |> Option.defaultValue (box DBNull.Value)
 
     /// Read the column with read, or return None for SQL NULL.
-    let readOptional (reader: System.Data.Common.DbDataReader) index read =
+    let readOptional (reader: DbDataReader) (index: int) (read: int -> 'T) : 'T option =
         if reader.IsDBNull index then None else Some(read index)
 
     /// Bind values to $1, $2, etc. in list order, then return the same command.
     /// This only adds parameters; it doesn't call Npgsql's Prepare method.
-    let prepare (command: NpgsqlCommand) values =
+    let prepare (command: NpgsqlCommand) (values: obj seq) : NpgsqlCommand =
         for value in values do
             command.Parameters.Add(NpgsqlParameter(Value = value)) |> ignore
 
@@ -23,7 +25,7 @@ module private Sql =
 
     /// Run the query and return its first value, such as an ID from INSERT ... RETURNING.
     /// Return null if no rows match. Dispose the command when done.
-    let scalar command values =
+    let scalar (command: NpgsqlCommand) (values: obj seq) : Task<obj> =
         task {
             use command = prepare command values
             return! command.ExecuteScalarAsync()
@@ -31,7 +33,7 @@ module private Sql =
 
     /// Run a SQL statement and ignore how many rows it changes.
     /// Dispose the command when done.
-    let execute command values =
+    let execute (command: NpgsqlCommand) (values: obj seq) : Task<unit> =
         task {
             use command = prepare command values
             let! _ = command.ExecuteNonQueryAsync()
@@ -40,7 +42,7 @@ module private Sql =
 
     /// Call read for each result row and return the results as a list.
     /// Return [] if no rows match. Dispose the reader and command when done.
-    let query command values read =
+    let query (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) : Task<'T list> =
         task {
             use command = prepare command values
             use! reader = command.ExecuteReaderAsync()
@@ -59,7 +61,7 @@ module private Sql =
 
     /// Call read for the first result row, or return None if no rows match.
     /// Dispose the reader and command when done.
-    let queryOne command values read =
+    let queryOne (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) : Task<'T option> =
         task {
             use command = prepare command values
             use! reader = command.ExecuteReaderAsync()
@@ -70,11 +72,11 @@ module private Sql =
 /// Load configuration, update board records, and save message captures.
 type StarboardRepository(dataSource: NpgsqlDataSource) =
     /// Create a command using the connection pool. The SQL helpers dispose it.
-    let command sql = dataSource.CreateCommand(sql)
+    let command (sql: string) : NpgsqlCommand = dataSource.CreateCommand(sql)
 
     /// Load the guild's configuration as JSON text, creating an empty list if needed.
     /// Core parses and validates the JSON.
-    member _.GetConfiguration(guildId: uint64) =
+    member _.GetConfiguration(guildId: uint64) : Task<string> =
         task {
             let values = [ box (decimal guildId) ]
 
@@ -94,13 +96,13 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
     /// Save the validated board list in one transaction and return each board's name and ID.
     /// Keep IDs for existing names. Mark missing boards inactive and keep their captures.
     /// Leave the configuration JSON unchanged.
-    member _.SynchronizeBoards(guildId: uint64, boards: BoardConfiguration list) =
+    member _.SynchronizeBoards(guildId: uint64, boards: BoardConfiguration list) : Task<Map<string, int64>> =
         task {
             use! connection = dataSource.OpenConnectionAsync()
             use! transaction = connection.BeginTransactionAsync()
 
             /// Create a command using this transaction.
-            let command sql =
+            let command (sql: string) : NpgsqlCommand =
                 new NpgsqlCommand(sql, connection, transaction)
 
             let sql =
@@ -144,17 +146,17 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
     /// Save the entry, source channel, reactions, attachments, and embeds in one transaction.
     /// Return Some entry ID, or None if a capture already exists for this message.
     /// Keep existing captures unchanged. Roll back all inserts if a write fails.
-    member _.SaveSnapshot(snapshot: MessageSnapshot) =
+    member _.SaveSnapshot(snapshot: MessageSnapshot) : Task<int64 option> =
         task {
             use! connection = dataSource.OpenConnectionAsync()
             use! transaction = connection.BeginTransactionAsync()
 
             /// Create a command using this transaction.
-            let command sql =
+            let command (sql: string) : NpgsqlCommand =
                 new NpgsqlCommand(sql, connection, transaction)
 
             /// Run a write in this transaction, binding values to $1, $2, etc.
-            let execute sql values = Sql.execute (command sql) values
+            let execute (sql: string) (values: obj seq) : Task<unit> = Sql.execute (command sql) values
             // Store the thread's own ID when the message comes from a thread.
             do!
                 execute
@@ -233,12 +235,12 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
 
     /// Find a capture by its source message ID and load its reactions, attachments, and embeds.
     /// Return None if no capture exists. Keep attachments and embeds in their original order.
-    member _.FindEntry(sourceMessageId: uint64) =
+    member _.FindEntry(sourceMessageId: uint64) : Task<Entry option> =
         task {
             use! connection = dataSource.OpenConnectionAsync()
 
             /// Use the same connection for all parts of the capture.
-            let command sql = new NpgsqlCommand(sql, connection)
+            let command (sql: string) : NpgsqlCommand = new NpgsqlCommand(sql, connection)
 
             let sql =
                 """
