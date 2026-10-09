@@ -143,6 +143,17 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
             return ids |> Map.ofSeq
         }
 
+    /// Check whether we already captured this message without loading its snapshot.
+    member _.HasEntry(sourceMessageId: uint64) : Task<bool> =
+        task {
+            let! exists =
+                Sql.scalar
+                    (command "SELECT EXISTS (SELECT 1 FROM starboard_entry WHERE source_message_id = $1)")
+                    [ box (decimal sourceMessageId) ]
+
+            return unbox<bool> exists
+        }
+
     /// Save the entry, source channel, reactions, attachments, and embeds in one transaction.
     /// Return Some entry ID, or None if a capture already exists for this message.
     /// Keep existing captures unchanged. Roll back all inserts if a write fails.

@@ -58,16 +58,15 @@ let slashCommandHandler (commandsByName: Map<string, Command>) (incomingCommand:
         | None -> do! incomingCommand.RespondAsync("unknown command")
     }
 
-let connect (commands: Command list) (configuration: Starboard.Runtime.ConfigurationStore) : Task<unit> =
+let connect
+    (commands: Command list)
+    (configuration: Starboard.Runtime.ConfigurationStore)
+    (repository: Masaryk.Postgres.StarboardRepository)
+    : Task<unit> =
     task {
         use reactions =
             Starboard.Events.start (fun reaction ->
-                task {
-                    let! result =
-                        Starboard.DiscordAdapter.evaluate client guildId configuration.Boards reaction
-
-                    result |> Option.iter Starboard.DiscordAdapter.report
-                })
+                Starboard.Capture.handle repository client guildId configuration.Boards reaction)
 
         Starboard.DiscordAdapter.subscribe client guildId reactions
         let commandsByName = CommandRegistry.byName commands
@@ -97,5 +96,5 @@ let main (args: string array) : int =
     let commands =
         CommandRegistry.create (Commands.Starboard.command configuration guildId managerRoleIds)
 
-    (connect commands configuration).GetAwaiter().GetResult()
+    (connect commands configuration repository).GetAwaiter().GetResult()
     0
