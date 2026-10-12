@@ -34,5 +34,8 @@ let handle
                     | Some id ->
                         printfn
                             $"Starboard {result.Board.Settings.Name}: captured entry {id} for {snapshot.SourceJumpUrl}."
+
+                        let! entry = repository.FindEntry(snapshot.SourceMessageId)
+                        do! Publication.publish repository client result.Board.Settings.Target (Option.get entry)
                     | None -> ()
     }

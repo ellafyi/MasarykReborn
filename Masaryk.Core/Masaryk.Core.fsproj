@@ -14,6 +14,8 @@
         <Compile Include="Starboard\Events.fs"/>
         <Compile Include="Starboard\DiscordAdapter.fs"/>
         <Compile Include="Starboard\Snapshot.fs"/>
+        <Compile Include="Starboard\Rendering.fs"/>
+        <Compile Include="Starboard\Publication.fs"/>
         <Compile Include="Starboard\Capture.fs"/>
         <Compile Include="Command.fs"/>
         <Compile Include="Commands\Cummy.fs"/>

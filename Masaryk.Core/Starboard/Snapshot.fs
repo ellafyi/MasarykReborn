@@ -32,6 +32,7 @@ let create (boardId: int64) (message: IMessage) (qualification: QualifyingReacti
         SourceCreatedAt = message.Timestamp.UtcDateTime
         AuthorUserId = Some message.Author.Id
         AuthorDisplayName = authorName message.Author
+        AuthorAvatarUrl = Option.ofObj (message.Author.GetDisplayAvatarUrl())
         Content = message.Content
         SourceJumpUrl = message.GetJumpUrl()
         QualifyingEmojiKey = emojiKey qualification.Emoji.Key

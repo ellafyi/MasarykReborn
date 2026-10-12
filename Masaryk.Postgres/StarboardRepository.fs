@@ -179,8 +179,8 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
             INSERT INTO starboard_entry
                 (starboard_id, source_channel_id, source_message_id, source_created_at,
                  author_user_id, author_display_name, content_snapshot, source_jump_url,
-                 qualifying_emoji_key, qualifying_emoji_name, qualifying_count)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                 qualifying_emoji_key, qualifying_emoji_name, qualifying_count, author_avatar_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (source_message_id) DO NOTHING RETURNING id
             """
 
@@ -199,6 +199,7 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                         box snapshot.QualifyingEmojiKey
                         box snapshot.QualifyingEmojiName
                         box snapshot.QualifyingCount
+                        Sql.optional snapshot.AuthorAvatarUrl
                     ]
 
             if isNull result then
@@ -244,6 +245,52 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                 return Some entryId
         }
 
+    /// Record the destination and start a pending entry's send attempt before calling Discord.
+    /// Leave paused boards and entries with a previous attempt alone.
+    member _.BeginPublication(entryId: int64, channelId: uint64) : Task<bool> =
+        task {
+            let! claimed =
+                Sql.scalar
+                    (command
+                        """
+                        UPDATE starboard_entry
+                        SET archive_status = 'sending', publication_channel_id = $2,
+                            publication_started_at = now(), publication_error = NULL
+                        WHERE id = $1 AND archive_status = 'pending'
+                          AND EXISTS (SELECT 1 FROM starboard
+                                      WHERE starboard.id = starboard_entry.starboard_id AND is_active)
+                        RETURNING id
+                        """)
+                    [ box entryId; box (decimal channelId) ]
+
+            return not (isNull claimed)
+        }
+
+    /// Save the send outcome without changing the captured snapshot.
+    /// Keep posted entries terminal, including when someone later deletes the archive message.
+    member _.RecordPublication(entryId: int64, result: PublicationResult) : Task<unit> =
+        let status, messageId, error =
+            match result with
+            | PublicationResult.Posted id -> "posted", Some id, None
+            | PublicationResult.Failed error -> "failed", None, Some error
+            | PublicationResult.Uncertain error -> "uncertain", None, Some error
+
+        Sql.execute
+            (command
+                """
+                UPDATE starboard_entry
+                SET archive_status = $2, archive_message_id = $3,
+                    posted_at = CASE WHEN $2 = 'posted' THEN now() ELSE NULL END,
+                    publication_error = $4
+                WHERE id = $1 AND archive_status = 'sending'
+                """)
+            [
+                box entryId
+                box status
+                Sql.optional (Option.map decimal messageId)
+                Sql.optional error
+            ]
+
     /// Find a capture by its source message ID and load its reactions, attachments, and embeds.
     /// Return None if no capture exists. Keep attachments and embeds in their original order.
     member _.FindEntry(sourceMessageId: uint64) : Task<Entry option> =
@@ -257,7 +304,8 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                 """
             SELECT id, captured_at, starboard_id, source_channel_id, source_message_id,
                    source_created_at, author_user_id, author_display_name, content_snapshot,
-                   source_jump_url, qualifying_emoji_key, qualifying_emoji_name, qualifying_count
+                   source_jump_url, qualifying_emoji_key, qualifying_emoji_name, qualifying_count,
+                   author_avatar_url
             FROM starboard_entry WHERE source_message_id = $1
             """
 
@@ -279,6 +327,7 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                                 QualifyingEmojiKey = r.GetString 10
                                 QualifyingEmojiName = r.GetString 11
                                 QualifyingCount = r.GetInt32 12
+                                AuthorAvatarUrl = Sql.readOptional r 13 r.GetString
                                 Reactions = []
                                 Attachments = []
                                 Embeds = []

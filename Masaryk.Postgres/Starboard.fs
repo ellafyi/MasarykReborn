@@ -34,6 +34,7 @@ type MessageSnapshot =
         SourceCreatedAt: DateTime
         AuthorUserId: uint64 option
         AuthorDisplayName: string
+        AuthorAvatarUrl: string option
         Content: string
         SourceJumpUrl: string
         QualifyingEmojiKey: string
@@ -50,3 +51,9 @@ type Entry =
         CapturedAt: DateTime
         Snapshot: MessageSnapshot
     }
+
+[<RequireQualifiedAccess>]
+type PublicationResult =
+    | Posted of messageId: uint64
+    | Failed of error: string
+    | Uncertain of error: string
