@@ -14,6 +14,7 @@ The plan is to eventually do everything the [old bot](https://github.com/zloutek
 Commands don't have to work exactly the same way, they just need to cover the same stuff.
 
 - [x] Starboard: as many boards as you want, set up in JSON (source channels, threshold, target channel). Posts are saved to the database, and replies show what they were replying to.
+- [x] Bookmarks: react with 🔖 to get a copy of a message in your DMs, react with 🗑️ on the copy to delete it
 
 From the old bot:
 
@@ -22,7 +23,6 @@ From the old bot:
 - [ ] Course channels: search MUNI courses, join/leave them, get access to their channels
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
-- [ ] Bookmarks (react to a message to get a copy in your DMs)
 - [ ] Auto-created threads in some channels
 - [ ] A custom-trained large language model, replacing the old Markov chain
 - [ ] Fun commands: emoji, avatars, server icon/banner, choose, hug, http.cat, emoji to ASCII art, etc.

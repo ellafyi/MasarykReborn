@@ -14,6 +14,7 @@ let client =
                 (GatewayIntents.Guilds
                  ||| GatewayIntents.GuildMessages
                  ||| GatewayIntents.GuildMessageReactions
+                 ||| GatewayIntents.DirectMessageReactions
                  ||| GatewayIntents.MessageContent)
         )
     )
@@ -72,7 +73,14 @@ let connect
                     $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
                 (fun reaction -> Starboard.Capture.handle repository client guildId configuration.Boards reaction)
 
+        use bookmarks =
+            Worker.start
+                (fun (request: Bookmarks.Request) ->
+                    $"Bookmark {request.Emote} for {request.ChannelId}/{request.MessageId}")
+                (fun request -> Bookmarks.handle client guildId request)
+
         Starboard.DiscordAdapter.subscribe client guildId reactions
+        Bookmarks.subscribe client bookmarks
         let commandsByName = CommandRegistry.byName commands
         client.add_Log (Func<LogMessage, Task>(log))
         client.add_Ready (Func<Task>(clientReady commands))
