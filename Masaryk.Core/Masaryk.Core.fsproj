@@ -7,6 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Services\Shared\MessageEmbed.fs"/>
+        <Compile Include="Services\Shared\Worker.fs"/>
         <Compile Include="Services\Starboard\Domain.fs"/>
         <Compile Include="Services\Starboard\Evaluation.fs"/>
         <Compile Include="Services\Starboard\Configuration.fs"/>

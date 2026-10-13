@@ -5,6 +5,7 @@ open System.Threading
 open System
 open Masaryk.Core
 open Masaryk.Core.Services
+open Masaryk.Core.Services.Shared
 
 let client =
     new DiscordSocketClient(
@@ -66,8 +67,10 @@ let connect
     : Task<unit> =
     task {
         use reactions =
-            Starboard.Events.start (fun reaction ->
-                Starboard.Capture.handle repository client guildId configuration.Boards reaction)
+            Worker.start
+                (fun (reaction: Starboard.Events.ReactionEvent) ->
+                    $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
+                (fun reaction -> Starboard.Capture.handle repository client guildId configuration.Boards reaction)
 
         Starboard.DiscordAdapter.subscribe client guildId reactions
         let commandsByName = CommandRegistry.byName commands

@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open System.Text.Json
 open Discord
 open Masaryk.Core.Services.Starboard
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres.Starboard
 
 let private jsonOptions =
@@ -16,15 +17,6 @@ let emojiKey (key: EmojiKey) : string =
     match key with
     | EmojiKey.Unicode value -> $"unicode:{value}"
     | EmojiKey.Custom id -> $"custom:{id}"
-
-let authorName (author: IUser) : string =
-    match author with
-    | :? IGuildUser as memberUser -> memberUser.DisplayName
-    | _ ->
-        if String.IsNullOrEmpty author.GlobalName then
-            author.Username
-        else
-            author.GlobalName
 
 /// Follow only actual replies in the source channel; other references may expose unrelated content.
 let private replyId (guildId: uint64) (channelId: uint64) (message: IMessage) : uint64 option =
@@ -83,7 +75,7 @@ let readReplies
                             if isNull parent then
                                 None
                             else
-                                Some(authorName parent.Author)
+                                Some(MessageEmbed.authorName parent.Author)
                         Content =
                             if isNull parent then
                                 None
@@ -117,7 +109,7 @@ let create
         SourceMessageId = message.Id
         SourceCreatedAt = message.Timestamp.UtcDateTime
         AuthorUserId = Some message.Author.Id
-        AuthorDisplayName = authorName message.Author
+        AuthorDisplayName = MessageEmbed.authorName message.Author
         AuthorAvatarUrl = Option.ofObj (message.Author.GetDisplayAvatarUrl())
         Content = message.Content
         SourceJumpUrl = message.GetJumpUrl()
