@@ -10,35 +10,27 @@ All parts of the bot are launched via a Docker Compose stack. Compose provides a
 
 ## Planned Features
 
-The [original bot's cogs](https://github.com/zloutek1/MasarykBOT/tree/main/bot/cogs)
-define the feature-parity baseline. Checked items are implemented in this rebuild;
-unchecked items are planned, not currently available. This is a scope checklist,
-not an implementation order or a commitment to preserve every command name.
+The plan is to eventually do everything the [old bot](https://github.com/zloutek1/MasarykBOT/tree/main/bot/cogs) did.
+Commands don't have to work exactly the same way, they just need to cover the same stuff.
 
-### Implemented
+- [x] Starboard: as many boards as you want, set up in JSON (source channels, threshold, target channel). Posts are saved to the database, and replies show what they were replying to.
 
-- [x] **Configurable starboard** — multiple boards, reaction thresholds, source-channel rules, persistent message snapshots, and archive publication.
+From the old bot:
 
-### Legacy feature parity
+- [ ] Leaderboards for users and channels
+- [ ] Message logging and backups
+- [ ] Course channels: search MUNI courses, join/leave them, get access to their channels
+- [ ] Verification, welcome DMs and the rules channel
+- [ ] Role menus (pick roles and channels by reacting)
+- [ ] Bookmarks (react to a message to get a copy in your DMs)
+- [ ] Auto-created threads in some channels
+- [ ] A custom-trained large language model, replacing the old Markov chain
+- [ ] Fun commands: emoji, avatars, server icon/banner, choose, hug, http.cat, emoji to ASCII art, etc.
+- [ ] Running code snippets (C, C++, Python, Haskell, APL)
+- [ ] Help, ping, uptime, server info
+- [ ] Admin commands (say, purge, sync, shutdown, logs)
+- [ ] Proper error messages, plus an error log channel
 
-- [ ] **Remaining legacy starboard behavior** — reply-chain context, channel/emoji/spoiler-sensitive thresholds, and dedicated best-of-memes and best-of-bot routing.
-- [ ] **Channel and user leaderboards** — message-based user rankings, channel/thread inclusion and exclusion filters, top users, and rankings around a selected member.
-- [ ] **Message logging and backups** — scheduled and administrator-triggered history collection, including messages, attachments, reactions, emoji usage, and server/channel/thread/member/role metadata.
-- [ ] **Course management** — MUNI faculty and course imports, search and autocomplete, course information, join/leave/leave-all registration, student course profiles, on-demand course channels and access management, registration-channel guidance, and registration recovery from existing channels.
-- [ ] **Verification and onboarding** — reaction-based verified-role assignment and removal, welcome DMs, and rules-channel setup and updates.
-- [ ] **Self-service role and channel menus** — reaction-driven role assignment/removal and channel visibility, with menu updates.
-- [ ] **Personal bookmarks** — save a message to DMs with its source link and attachment preview, then delete the saved bookmark.
-- [ ] **Automatic threads** — create threads for new messages in configured channels, deriving titles from message text or linked pages.
-- [ ] **Markov text generation** — learn from backed-up server messages, generate text, continue a supplied prompt, retrain on demand, and respond to bot mentions.
-- [ ] **Fun and media utilities** — emoji lists and images/URLs, server icons and banners, user avatars, random choices and yes/no answers, hugs, night-sky art, HTTP cats, and emoji-to-Braille art.
-- [ ] **Code evaluation** — external compilation/execution of C, C++, Python, Haskell, and APL snippets, with results returned in Discord.
-- [ ] **Help and information** — paginated command/category help, command usage, uptime, latency, invite links, and server/category/channel/member statistics.
-- [ ] **Administration and operations** — administrator message posting and purging, command synchronization, owner-only shutdown and presence controls, log retrieval, and feature-module listing/load/unload/reload equivalents.
-- [ ] **Command error handling** — actionable input, permission, and cooldown feedback, plus diagnostic reporting to configured error channels.
+New:
 
-Parity means equivalent capabilities on the new platform, not a literal copy of
-Python cogs, external service integrations, or legacy implementation quirks.
-
-### Beyond legacy parity
-
-- [ ] **LLM conversation integration** — a new conversational capability, separate from the original bot's Markov generator.
+- [ ] LLM chat

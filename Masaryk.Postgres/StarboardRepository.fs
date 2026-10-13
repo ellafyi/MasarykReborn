@@ -179,8 +179,9 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
             INSERT INTO starboard_entry
                 (starboard_id, source_channel_id, source_message_id, source_created_at,
                  author_user_id, author_display_name, content_snapshot, source_jump_url,
-                 qualifying_emoji_key, qualifying_emoji_name, qualifying_count, author_avatar_url)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 qualifying_emoji_key, qualifying_emoji_name, qualifying_count, author_avatar_url,
+                 reply_context_truncated)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (source_message_id) DO NOTHING RETURNING id
             """
 
@@ -200,6 +201,7 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                         box snapshot.QualifyingEmojiName
                         box snapshot.QualifyingCount
                         Sql.optional snapshot.AuthorAvatarUrl
+                        box snapshot.RepliesTruncated
                     ]
 
             if isNull result then
@@ -240,6 +242,25 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                         execute
                             "INSERT INTO entry_embed (entry_id, position, metadata) VALUES ($1, $2, $3::jsonb)"
                             [ box entryId; box position; box metadata ]
+
+                for position, reply in List.indexed snapshot.Replies do
+                    do!
+                        execute
+                            """
+                    INSERT INTO entry_reply
+                        (entry_id, position, source_channel_id, source_message_id,
+                         author_display_name, content_snapshot, source_jump_url)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """
+                            [
+                                box entryId
+                                box position
+                                box (decimal reply.SourceChannelId)
+                                box (decimal reply.SourceMessageId)
+                                Sql.optional reply.AuthorDisplayName
+                                Sql.optional reply.Content
+                                box reply.SourceJumpUrl
+                            ]
 
                 do! transaction.CommitAsync()
                 return Some entryId
@@ -305,7 +326,7 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
             SELECT id, captured_at, starboard_id, source_channel_id, source_message_id,
                    source_created_at, author_user_id, author_display_name, content_snapshot,
                    source_jump_url, qualifying_emoji_key, qualifying_emoji_name, qualifying_count,
-                   author_avatar_url
+                   author_avatar_url, reply_context_truncated
             FROM starboard_entry WHERE source_message_id = $1
             """
 
@@ -331,6 +352,8 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                                 Reactions = []
                                 Attachments = []
                                 Embeds = []
+                                Replies = []
+                                RepliesTruncated = r.GetBoolean 14
                             }
                     })
 
@@ -373,11 +396,30 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                         parameters
                         (fun r -> r.GetString 0)
 
+                let! replies =
+                    Sql.query
+                        (command
+                            """
+                            SELECT source_channel_id, source_message_id, author_display_name,
+                                   content_snapshot, source_jump_url
+                            FROM entry_reply WHERE entry_id = $1 ORDER BY position
+                            """)
+                        parameters
+                        (fun r ->
+                            {
+                                SourceChannelId = uint64 (r.GetDecimal 0)
+                                SourceMessageId = uint64 (r.GetDecimal 1)
+                                AuthorDisplayName = Sql.readOptional r 2 r.GetString
+                                Content = Sql.readOptional r 3 r.GetString
+                                SourceJumpUrl = r.GetString 4
+                            })
+
                 let snapshot =
                     { entry.Snapshot with
                         Reactions = reactions
                         Attachments = attachments
                         Embeds = embeds
+                        Replies = replies
                     }
 
                 return Some { entry with Snapshot = snapshot }

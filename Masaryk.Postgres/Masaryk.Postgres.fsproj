@@ -15,6 +15,7 @@
         <EmbeddedResource Include="Migrations/001_initial_schema.sql" />
         <EmbeddedResource Include="Migrations/002_starboard_publication.sql" />
         <EmbeddedResource Include="Migrations/003_starboard_author_avatar.sql" />
+        <EmbeddedResource Include="Migrations/004_starboard_reply_context.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

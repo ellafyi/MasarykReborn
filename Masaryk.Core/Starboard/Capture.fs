@@ -27,7 +27,15 @@ let handle
                 match result.Qualification with
                 | None -> ()
                 | Some qualification ->
-                    let snapshot = Snapshot.create result.Board.Id result.Message qualification
+                    let! replies, repliesTruncated =
+                        Snapshot.readReplies
+                            (fun id -> result.Message.Channel.GetMessageAsync(id))
+                            guildId
+                            result.Message
+
+                    let snapshot =
+                        Snapshot.create result.Board.Id result.Message qualification replies repliesTruncated
+
                     let! entryId = repository.SaveSnapshot(snapshot)
 
                     match entryId with

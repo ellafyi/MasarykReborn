@@ -26,6 +26,15 @@ type AttachmentSnapshot =
         SizeBytes: int64 option
     }
 
+type ReplySnapshot =
+    {
+        SourceChannelId: uint64
+        SourceMessageId: uint64
+        AuthorDisplayName: string option
+        Content: string option
+        SourceJumpUrl: string
+    }
+
 type MessageSnapshot =
     {
         BoardId: int64
@@ -43,6 +52,8 @@ type MessageSnapshot =
         Reactions: ReactionSnapshot list
         Attachments: AttachmentSnapshot list
         Embeds: string list
+        Replies: ReplySnapshot list
+        RepliesTruncated: bool
     }
 
 type Entry =

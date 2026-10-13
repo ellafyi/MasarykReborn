@@ -1,6 +1,9 @@
 module Masaryk.Core.Starboard.Snapshot
 
 open System
+open System.Collections.Generic
+open System.Net
+open System.Threading.Tasks
 open System.Text.Json
 open Discord
 open Masaryk.Core.Starboard
@@ -23,8 +26,91 @@ let authorName (author: IUser) : string =
         else
             author.GlobalName
 
+/// Follow only actual replies in the source channel; other references may expose unrelated content.
+let private replyId (guildId: uint64) (channelId: uint64) (message: IMessage) : uint64 option =
+    let reference = message.Reference
+
+    if
+        message.Type = MessageType.Reply
+        && not (isNull reference)
+        && reference.MessageId.IsSpecified
+        && reference.ChannelId = channelId
+        && (not reference.GuildId.IsSpecified || reference.GuildId.Value = guildId)
+        && (not reference.ReferenceType.IsSpecified
+            || reference.ReferenceType.Value = MessageReferenceType.Default)
+    then
+        Some reference.MessageId.Value
+    else
+        None
+
+/// Freeze up to sixteen ancestors, oldest first, retaining links to unavailable messages.
+let readReplies
+    (fetch: uint64 -> Task<IMessage>)
+    (guildId: uint64)
+    (message: IMessage)
+    : Task<ReplySnapshot list * bool> =
+    task {
+        let channelId = message.Channel.Id
+        let visited = HashSet<uint64>()
+        visited.Add message.Id |> ignore
+        let mutable next = replyId guildId channelId message
+        let mutable replies = []
+        let mutable truncated = false
+
+        while next.IsSome do
+            let id = next.Value
+
+            if visited.Count > 16 || not (visited.Add id) then
+                truncated <- true
+                next <- None
+            else
+                let! parent =
+                    task {
+                        try
+                            return! fetch id
+                        with :? Discord.Net.HttpException as error when
+                            error.HttpCode = HttpStatusCode.NotFound
+                            || error.HttpCode = HttpStatusCode.Forbidden ->
+                            eprintfn $"Starboard reply {channelId}/{id} unavailable: {error.HttpCode}."
+                            return null
+                    }
+
+                let reply =
+                    {
+                        SourceChannelId = channelId
+                        SourceMessageId = id
+                        AuthorDisplayName =
+                            if isNull parent then
+                                None
+                            else
+                                Some(authorName parent.Author)
+                        Content =
+                            if isNull parent then
+                                None
+                            else
+                                Some(defaultArg (Option.ofObj parent.Content) "")
+                        SourceJumpUrl = $"https://discord.com/channels/{guildId}/{channelId}/{id}"
+                    }
+
+                replies <- reply :: replies
+
+                next <-
+                    if isNull parent then
+                        None
+                    else
+                        replyId guildId channelId parent
+
+        return replies, truncated
+    }
+
 /// Copy the evaluated message into storage records. Keep original media URLs unchanged.
-let create (boardId: int64) (message: IMessage) (qualification: QualifyingReaction) : MessageSnapshot =
+let create
+    (boardId: int64)
+    (message: IMessage)
+    (qualification: QualifyingReaction)
+    (replies: ReplySnapshot list)
+    (repliesTruncated: bool)
+    : MessageSnapshot =
     {
         BoardId = boardId
         SourceChannelId = message.Channel.Id
@@ -65,4 +151,6 @@ let create (boardId: int64) (message: IMessage) (qualification: QualifyingReacti
             message.Embeds
             |> Seq.map (fun embed -> JsonSerializer.Serialize<IEmbed>(embed, jsonOptions))
             |> Seq.toList
+        Replies = replies
+        RepliesTruncated = repliesTruncated
     }
