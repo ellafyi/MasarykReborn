@@ -1,4 +1,4 @@
-module Masaryk.Core.Starboard.Snapshot
+module Masaryk.Core.Services.Starboard.Snapshot
 
 open System
 open System.Collections.Generic
@@ -6,7 +6,7 @@ open System.Net
 open System.Threading.Tasks
 open System.Text.Json
 open Discord
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 open Masaryk.Postgres.Starboard
 
 let private jsonOptions =

@@ -1,4 +1,4 @@
-module Masaryk.Core.Starboard.Publication
+module Masaryk.Core.Services.Starboard.Publication
 
 open System
 open System.Threading.Tasks

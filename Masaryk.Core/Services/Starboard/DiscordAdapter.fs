@@ -1,11 +1,11 @@
-module Masaryk.Core.Starboard.DiscordAdapter
+module Masaryk.Core.Services.Starboard.DiscordAdapter
 
 open System
 open System.Threading.Tasks
 open Discord
 open Discord.Rest
 open Discord.WebSocket
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 
 type EvaluationResult =
     {
@@ -15,7 +15,7 @@ type EvaluationResult =
         Qualification: QualifyingReaction option
     }
 
-let emoji (emote: IEmote) : Masaryk.Core.Starboard.Emoji =
+let emoji (emote: IEmote) : Masaryk.Core.Services.Starboard.Emoji =
     {
         Key =
             match emote with

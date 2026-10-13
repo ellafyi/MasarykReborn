@@ -1,6 +1,6 @@
-module Masaryk.Core.Starboard.Evaluation
+module Masaryk.Core.Services.Starboard.Evaluation
 
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 
 type Qualification =
     {

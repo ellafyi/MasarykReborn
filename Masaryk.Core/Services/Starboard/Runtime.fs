@@ -1,9 +1,9 @@
-module Masaryk.Core.Starboard.Runtime
+module Masaryk.Core.Services.Starboard.Runtime
 
 open System
 open System.Threading
 open System.Threading.Tasks
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 open Masaryk.Postgres
 
 type ConfigurationStore(repository: StarboardRepository, guildId: uint64) =

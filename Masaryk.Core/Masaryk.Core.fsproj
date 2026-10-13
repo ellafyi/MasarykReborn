@@ -7,16 +7,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Starboard\Domain.fs"/>
-        <Compile Include="Starboard\Evaluation.fs"/>
-        <Compile Include="Starboard\Configuration.fs"/>
-        <Compile Include="Starboard\Runtime.fs"/>
-        <Compile Include="Starboard\Events.fs"/>
-        <Compile Include="Starboard\DiscordAdapter.fs"/>
-        <Compile Include="Starboard\Snapshot.fs"/>
-        <Compile Include="Starboard\Rendering.fs"/>
-        <Compile Include="Starboard\Publication.fs"/>
-        <Compile Include="Starboard\Capture.fs"/>
+        <Compile Include="Services\Starboard\Domain.fs"/>
+        <Compile Include="Services\Starboard\Evaluation.fs"/>
+        <Compile Include="Services\Starboard\Configuration.fs"/>
+        <Compile Include="Services\Starboard\Runtime.fs"/>
+        <Compile Include="Services\Starboard\Events.fs"/>
+        <Compile Include="Services\Starboard\DiscordAdapter.fs"/>
+        <Compile Include="Services\Starboard\Snapshot.fs"/>
+        <Compile Include="Services\Starboard\Rendering.fs"/>
+        <Compile Include="Services\Starboard\Publication.fs"/>
+        <Compile Include="Services\Starboard\Capture.fs"/>
         <Compile Include="Command.fs"/>
         <Compile Include="Commands\Cummy.fs"/>
         <Compile Include="Commands\Test.fs"/>

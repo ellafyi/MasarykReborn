@@ -1,4 +1,4 @@
-namespace Masaryk.Core.Starboard
+namespace Masaryk.Core.Services.Starboard
 
 [<RequireQualifiedAccess>]
 type EmojiKey =

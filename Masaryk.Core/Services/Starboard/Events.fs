@@ -1,7 +1,7 @@
-module Masaryk.Core.Starboard.Events
+module Masaryk.Core.Services.Starboard.Events
 
 open System.Threading.Tasks
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 
 type ReactionEvent =
     {

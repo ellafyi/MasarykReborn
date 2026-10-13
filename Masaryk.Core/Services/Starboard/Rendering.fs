@@ -1,4 +1,4 @@
-module Masaryk.Core.Starboard.Rendering
+module Masaryk.Core.Services.Starboard.Rendering
 
 open System
 open System.Text.Json

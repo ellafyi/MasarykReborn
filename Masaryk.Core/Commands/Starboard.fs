@@ -5,7 +5,7 @@ open Discord
 open Discord.WebSocket
 open Npgsql
 open Masaryk.Core
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 
 let command (configuration: Runtime.ConfigurationStore) (guildId: uint64) (managerRoleIds: Set<uint64>) : Command =
     let handle (interaction: SocketSlashCommand) : Task =

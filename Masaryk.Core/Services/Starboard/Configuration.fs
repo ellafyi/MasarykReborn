@@ -1,9 +1,9 @@
-module Masaryk.Core.Starboard.Configuration
+module Masaryk.Core.Services.Starboard.Configuration
 
 open System
 open System.Text.Json
 open System.Text.Json.Serialization
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 
 exception InvalidConfiguration of string
 

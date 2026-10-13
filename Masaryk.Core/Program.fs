@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open System.Threading
 open System
 open Masaryk.Core
+open Masaryk.Core.Services
 
 let client =
     new DiscordSocketClient(

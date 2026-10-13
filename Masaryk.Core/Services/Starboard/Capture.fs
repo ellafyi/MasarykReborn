@@ -1,8 +1,8 @@
-module Masaryk.Core.Starboard.Capture
+module Masaryk.Core.Services.Starboard.Capture
 
 open System.Threading.Tasks
 open Discord.WebSocket
-open Masaryk.Core.Starboard
+open Masaryk.Core.Services.Starboard
 open Masaryk.Postgres
 
 /// Skip existing captures and save the first qualifying snapshot.
