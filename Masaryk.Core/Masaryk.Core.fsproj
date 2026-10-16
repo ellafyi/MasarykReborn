@@ -21,10 +21,13 @@
         <Compile Include="Services\Starboard\Capture.fs"/>
         <Compile Include="Services\Bookmarks.fs"/>
         <Compile Include="Services\Chat.fs"/>
+        <Compile Include="Services\Leaderboard\Counting.fs"/>
+        <Compile Include="Services\Leaderboard\Ranking.fs"/>
         <Compile Include="Command.fs"/>
         <Compile Include="Commands\Cummy.fs"/>
         <Compile Include="Commands\Test.fs"/>
         <Compile Include="Commands\Starboard.fs"/>
+        <Compile Include="Commands\Leaderboard.fs"/>
         <Compile Include="CommandRegistry.fs"/>
     </ItemGroup>
 

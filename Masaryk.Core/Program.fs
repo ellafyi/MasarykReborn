@@ -66,6 +66,7 @@ let connect
     (configuration: Starboard.Runtime.ConfigurationStore)
     (repository: Masaryk.Postgres.StarboardRepository)
     (chat: (Chat.Settings * Masaryk.Postgres.ChatRepository) option)
+    (leaderboard: Masaryk.Postgres.LeaderboardRepository)
     : Task<unit> =
     task {
         use reactions =
@@ -89,6 +90,8 @@ let connect
                 (fun (message: IUserMessage) -> $"Chat reply to {message.Channel.Id}/{message.Id}")
                 (fun message -> Chat.handle client settings chatRepository message)
             |> Chat.subscribe client guildId)
+
+        Leaderboard.Counting.subscribe client guildId leaderboard
 
         let commandsByName = CommandRegistry.byName commands
         client.add_Log (Func<LogMessage, Task>(log))
@@ -114,8 +117,14 @@ let main (args: string array) : int =
     printfn $"%s{configuration.Reload().GetAwaiter().GetResult()}"
     let managerRoleIds = Starboard.Configuration.managerRolesFromEnvironment ()
 
+    let leaderboard = Masaryk.Postgres.LeaderboardRepository(database)
+    let countingSince = leaderboard.StartCounting().GetAwaiter().GetResult()
+    printfn $"Leaderboard: counting messages since {countingSince:u}."
+
     let commands =
-        CommandRegistry.create (Commands.Starboard.command configuration guildId managerRoleIds)
+        CommandRegistry.create
+            (Commands.Starboard.command configuration guildId managerRoleIds)
+            (Commands.Leaderboard.command leaderboard)
 
     let chat =
         Chat.fromEnvironment ()
@@ -124,5 +133,5 @@ let main (args: string array) : int =
     if chat.IsNone then
         printfn "Chat: disabled; set LLM_API_URL to enable it."
 
-    (connect commands configuration repository chat).GetAwaiter().GetResult()
+    (connect commands configuration repository chat leaderboard).GetAwaiter().GetResult()
     0

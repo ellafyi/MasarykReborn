@@ -11,6 +11,7 @@
         <Compile Include="Starboard.fs"/>
         <Compile Include="StarboardRepository.fs"/>
         <Compile Include="ChatRepository.fs"/>
+        <Compile Include="LeaderboardRepository.fs"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -19,6 +20,7 @@
         <EmbeddedResource Include="Migrations/003_starboard_author_avatar.sql" />
         <EmbeddedResource Include="Migrations/004_starboard_reply_context.sql" />
         <EmbeddedResource Include="Migrations/005_llm_reply.sql" />
+        <EmbeddedResource Include="Migrations/006_leaderboard.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 
