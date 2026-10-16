@@ -12,6 +12,7 @@
         <Compile Include="StarboardRepository.fs"/>
         <Compile Include="ChatRepository.fs"/>
         <Compile Include="LeaderboardRepository.fs"/>
+        <Compile Include="LegacyImport.fs"/>
     </ItemGroup>
 
     <ItemGroup>

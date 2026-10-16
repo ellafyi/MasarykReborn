@@ -27,6 +27,7 @@
         <Compile Include="Services\Leaderboard\Counting.fs"/>
         <Compile Include="Services\Leaderboard\Ranking.fs"/>
         <Compile Include="Services\Leaderboard\SlashCommand.fs"/>
+        <Compile Include="Services\Leaderboard\Import.fs"/>
         <Compile Include="Services\Leaderboard\Feature.fs"/>
         <Compile Include="Commands\Cummy.fs"/>
         <Compile Include="Commands\Test.fs"/>

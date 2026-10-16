@@ -69,6 +69,14 @@ let features: Feature list =
         Leaderboard.Feature.start
     ]
 
+let token () =
+    let value = Environment.GetEnvironmentVariable("BOT_TOKEN")
+
+    if String.IsNullOrWhiteSpace value then
+        invalidOp "BOT_TOKEN environment variable is required."
+
+    value
+
 let run (context: Context) : Task<unit> =
     task {
         let mutable commands = CommandRegistry.builtIn
@@ -82,14 +90,8 @@ let run (context: Context) : Task<unit> =
         client.add_Ready (Func<Task>(clientReady commands))
         client.add_SlashCommandExecuted (Func<SocketSlashCommand, Task>(slashCommandHandler commandsByName))
 
-        let token = Environment.GetEnvironmentVariable("BOT_TOKEN")
-
-        if String.IsNullOrWhiteSpace token then
-            invalidOp "BOT_TOKEN environment variable is required."
-
-        do! client.LoginAsync(TokenType.Bot, token)
+        do! client.LoginAsync(TokenType.Bot, token ())
         do! client.StartAsync()
-
         do! Task.Delay(Timeout.Infinite)
     }
 
@@ -97,13 +99,16 @@ let run (context: Context) : Task<unit> =
 let main (args: string array) : int =
     use database = Masaryk.Postgres.Database.fromEnvironment ()
 
-    (run
-        {
-            Client = client
-            GuildId = guildId
-            Database = database
-        })
-        .GetAwaiter()
-        .GetResult()
+    let work =
+        match args with
+        | [| "import-history" |] -> Leaderboard.Import.run database guildId (token ())
+        | _ ->
+            run
+                {
+                    Client = client
+                    GuildId = guildId
+                    Database = database
+                }
 
+    work.GetAwaiter().GetResult()
     0
