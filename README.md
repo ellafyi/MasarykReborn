@@ -15,6 +15,7 @@ Commands don't have to work exactly the same way, they just need to cover the sa
 
 - [x] Starboard: as many boards as you want, set up in JSON (source channels, threshold, target channel). Posts are saved to the database, and replies show what they were replying to.
 - [x] Bookmarks: react with 🔖 to get a copy of a message in your DMs, react with 🗑️ on the copy to delete it
+- [x] Chat with a custom-trained language model (replacing the old Markov chain): @mention the bot or reply to one of its model replies, and it answers using the last few messages as context
 
 From the old bot:
 
@@ -24,13 +25,8 @@ From the old bot:
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels
-- [ ] A custom-trained large language model, replacing the old Markov chain
 - [ ] Fun commands: emoji, avatars, server icon/banner, choose, hug, http.cat, emoji to ASCII art, etc.
 - [ ] Running code snippets (C, C++, Python, Haskell, APL)
 - [ ] Help, ping, uptime, server info
 - [ ] Admin commands (say, purge, sync, shutdown, logs)
 - [ ] Proper error messages, plus an error log channel
-
-New:
-
-- [ ] LLM chat

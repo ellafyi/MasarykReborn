@@ -65,6 +65,7 @@ let connect
     (commands: Command list)
     (configuration: Starboard.Runtime.ConfigurationStore)
     (repository: Masaryk.Postgres.StarboardRepository)
+    (chat: (Chat.Settings * Masaryk.Postgres.ChatRepository) option)
     : Task<unit> =
     task {
         use reactions =
@@ -81,6 +82,14 @@ let connect
 
         Starboard.DiscordAdapter.subscribe client guildId reactions
         Bookmarks.subscribe client bookmarks
+
+        chat
+        |> Option.iter (fun (settings, chatRepository) ->
+            Worker.start
+                (fun (message: IUserMessage) -> $"Chat reply to {message.Channel.Id}/{message.Id}")
+                (fun message -> Chat.handle client settings chatRepository message)
+            |> Chat.subscribe client guildId)
+
         let commandsByName = CommandRegistry.byName commands
         client.add_Log (Func<LogMessage, Task>(log))
         client.add_Ready (Func<Task>(clientReady commands))
@@ -108,5 +117,12 @@ let main (args: string array) : int =
     let commands =
         CommandRegistry.create (Commands.Starboard.command configuration guildId managerRoleIds)
 
-    (connect commands configuration repository).GetAwaiter().GetResult()
+    let chat =
+        Chat.fromEnvironment ()
+        |> Option.map (fun settings -> settings, Masaryk.Postgres.ChatRepository(database))
+
+    if chat.IsNone then
+        printfn "Chat: disabled; set LLM_API_URL to enable it."
+
+    (connect commands configuration repository chat).GetAwaiter().GetResult()
     0
