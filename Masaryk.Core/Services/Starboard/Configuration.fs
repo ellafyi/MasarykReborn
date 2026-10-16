@@ -3,7 +3,9 @@ module Masaryk.Core.Services.Starboard.Configuration
 open System
 open System.Text.Json
 open System.Text.Json.Serialization
+open System.Threading.Tasks
 open Masaryk.Core.Services.Starboard
+open Masaryk.Postgres
 
 exception InvalidConfiguration of string
 
@@ -22,7 +24,8 @@ let private require (condition: bool) (message: string) : unit =
     if not condition then
         raise (InvalidConfiguration message)
 
-let private validate (boards: BoardSettings list) : unit =
+/// Each message must belong to at most one board.
+let private validate (boards: Board list) : unit =
     require (boards |> List.countBy _.Name |> List.forall (fun (_, count) -> count = 1)) "Board names must be unique."
 
     require
@@ -30,7 +33,7 @@ let private validate (boards: BoardSettings list) : unit =
         "Each board must have a different target channel."
 
     let targets = boards |> List.map _.Target |> Set.ofList
-    let sources (board: BoardSettings) : Set<uint64> = Set.difference board.Channels targets
+    let sources (board: Board) = Set.difference board.Channels targets
 
     for index, left in List.indexed boards do
         for right in List.skip (index + 1) boards do
@@ -46,7 +49,7 @@ let private validate (boards: BoardSettings list) : unit =
 
             require (not overlap) $"Source rules overlap between '{left.Name}' and '{right.Name}'."
 
-let parse (json: string) : BoardSettings list =
+let parse (json: string) : Board list =
     let options =
         JsonSerializerOptions(
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -70,19 +73,14 @@ let parse (json: string) : BoardSettings list =
             require (board.Threshold > 0) $"Board '{board.Name}' needs a positive threshold."
             require (not (isNull board.Channels)) $"Board '{board.Name}' needs a channels array."
 
-            require
-                (board.Channels |> Array.forall (fun id -> id > 0UL))
-                $"Board '{board.Name}' has an invalid source channel ID."
-
-            let mode =
-                match board.Mode with
-                | "whitelist" -> SourceMode.Whitelist
-                | "blacklist" -> SourceMode.Blacklist
-                | _ -> raise (InvalidConfiguration $"Board '{board.Name}' mode must be 'whitelist' or 'blacklist'.")
-
             {
                 Name = board.Name
-                Mode = mode
+                Mode =
+                    match board.Mode with
+                    | "whitelist" -> SourceMode.Whitelist
+                    | "blacklist" -> SourceMode.Blacklist
+                    | _ ->
+                        raise (InvalidConfiguration $"Board '{board.Name}' mode must be 'whitelist' or 'blacklist'.")
                 Channels = Set.ofArray board.Channels
                 Target = board.Target
                 Threshold = board.Threshold
@@ -93,17 +91,15 @@ let parse (json: string) : BoardSettings list =
     validate boards
     boards
 
-let parseManagerRoles (value: string) : Set<uint64> =
-    if String.IsNullOrWhiteSpace value then
-        Set.empty
-    else
-        value.Split(',', StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun value ->
-            match UInt64.TryParse value with
-            | true, id when id > 0UL -> id
-            | _ -> invalidOp "STARBOARD_MANAGER_ROLE_IDS must contain comma-separated positive role IDs.")
-        |> Set.ofArray
+/// The boards in use; a failed reload keeps the previous ones.
+type ConfigurationStore(repository: StarboardRepository, guildId: uint64) =
+    let mutable boards: Board list = []
 
-let managerRolesFromEnvironment () : Set<uint64> =
-    Environment.GetEnvironmentVariable("STARBOARD_MANAGER_ROLE_IDS")
-    |> parseManagerRoles
+    member _.Boards = boards
+
+    member _.Reload() : Task<string> =
+        task {
+            let! json = repository.GetConfiguration(guildId)
+            boards <- parse json
+            return $"Starboard configuration loaded: {boards.Length} boards."
+        }

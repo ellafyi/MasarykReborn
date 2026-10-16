@@ -8,16 +8,15 @@ let start: Feature =
     fun context ->
         task {
             let repository = StarboardRepository(context.Database)
-            let configuration = new Runtime.ConfigurationStore(repository, context.GuildId)
+            let configuration = Configuration.ConfigurationStore(repository, context.GuildId)
             let! loaded = configuration.Reload()
             printfn $"{loaded}"
 
             Worker.start
-                (fun (reaction: Events.ReactionEvent) ->
+                (fun (reaction: DiscordAdapter.ReactionEvent) ->
                     $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
-                (fun reaction -> Capture.handle repository context.Client context.GuildId configuration.Boards reaction)
+                (fun reaction -> Capture.handle context.Client repository context.GuildId configuration.Boards reaction)
             |> DiscordAdapter.subscribe context.Client context.GuildId
 
-            let managerRoleIds = Configuration.managerRolesFromEnvironment ()
-            return [ SlashCommand.command configuration context.GuildId managerRoleIds ]
+            return [ SlashCommand.command configuration ]
         }

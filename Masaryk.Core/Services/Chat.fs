@@ -74,26 +74,6 @@ let complete (settings: Settings) (messages: Message list) : Task<string> =
         return choice.GetProperty("message").GetProperty("content").GetString()
     }
 
-let private parentId (message: IMessage) : uint64 option =
-    if message.Type = MessageType.Reply then
-        Some message.Reference.MessageId.Value
-    else
-        None
-
-let rec replyChain (fetch: uint64 -> Task<IMessage>) (limit: int) (message: IMessage) : Task<IMessage list> =
-    task {
-        match parentId message with
-        | Some id when limit > 0 ->
-            let! parent = fetch id
-
-            if isNull parent then
-                return []
-            else
-                let! older = replyChain fetch (limit - 1) parent
-                return older @ [ parent ]
-        | _ -> return []
-    }
-
 // Discord also counts the replied-to author as mentioned, so check the text.
 let private mentionsBot (botId: uint64) (message: IMessage) = message.Content.Contains $"<@{botId}>"
 
@@ -102,7 +82,7 @@ let isCandidate (botId: uint64) (guildId: uint64) (message: IMessage) : bool =
     | :? IGuildChannel as channel ->
         channel.GuildId = guildId
         && not message.Author.IsBot
-        && (mentionsBot botId message || (parentId message).IsSome)
+        && (mentionsBot botId message || (Replies.parentId message).IsSome)
     | _ -> false
 
 let private urls = Regex(@"https?://\S+|www\.\S+")
@@ -161,8 +141,8 @@ let private history (trigger: IUserMessage) : Task<IMessage list> =
         let channel = trigger.Channel
 
         let! earlier =
-            if (parentId trigger).IsSome then
-                replyChain (fun id -> channel.GetMessageAsync(id)) (contextSize - 1) trigger
+            if (Replies.parentId trigger).IsSome then
+                Replies.ancestors (fun id -> channel.GetMessageAsync(id)) (contextSize - 1) trigger
             else
                 task {
                     let pages = channel.GetMessagesAsync(trigger, Direction.Before, contextSize - 1)
@@ -179,7 +159,7 @@ let private noPings =
 let handle (client: DiscordSocketClient) (settings: Settings) (repository: ChatRepository) (trigger: IUserMessage) =
     task {
         let botId = client.CurrentUser.Id
-        let! parent = repository.FindReplies(Option.toList (parentId trigger))
+        let! parent = repository.FindReplies(Option.toList (Replies.parentId trigger))
 
         if mentionsBot botId trigger || not parent.IsEmpty then
             use _typing = trigger.Channel.EnterTypingState()

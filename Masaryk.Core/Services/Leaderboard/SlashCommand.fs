@@ -111,5 +111,6 @@ let command (repository: LeaderboardRepository) : Command =
                     .WithType(ApplicationCommandOptionType.SubCommand)
                     .AddOption(periodOption ())
             ]
+        Permission = None
         Handle = handle
     }

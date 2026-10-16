@@ -10,6 +10,8 @@ type Command =
         Name: string
         Description: string
         Options: SlashCommandOptionBuilder list
+        /// Who can use the command by default; None means everyone.
+        Permission: GuildPermission option
         Handle: SocketSlashCommand -> Task
     }
 

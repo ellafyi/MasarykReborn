@@ -7,5 +7,6 @@ let command: Command =
         Name = "test"
         Description = "testing"
         Options = []
+        Permission = None
         Handle = fun interaction -> task { do! interaction.RespondAsync("testing") }
     }

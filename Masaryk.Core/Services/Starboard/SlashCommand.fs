@@ -3,47 +3,30 @@ module Masaryk.Core.Services.Starboard.SlashCommand
 open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
-open Npgsql
 open Masaryk.Core
 open Masaryk.Core.Services.Starboard
 
-let command (configuration: Runtime.ConfigurationStore) (guildId: uint64) (managerRoleIds: Set<uint64>) : Command =
+/// Server admins can change who may use this under Server Settings → Integrations.
+let command (configuration: Configuration.ConfigurationStore) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
-            match interaction.User with
-            | :? SocketGuildUser as user when
-                user.Guild.Id = guildId
-                && (user.Roles |> Seq.exists (fun role -> Set.contains role.Id managerRoleIds))
-                ->
-                do! interaction.DeferAsync(ephemeral = true)
+            do! interaction.DeferAsync(ephemeral = true)
 
-                let! response =
-                    task {
-                        try
-                            return! configuration.Reload()
-                        with
-                        | Configuration.InvalidConfiguration message ->
-                            return $"Configuration was not applied: {message}"
-                        | :? NpgsqlException as error ->
-                            eprintfn $"Starboard reload failed: %s{error.Message}"
-                            return "Starboard reload failed. Check the database configuration and bot logs."
-                    }
+            let! response =
+                task {
+                    try
+                        return! configuration.Reload()
+                    with Configuration.InvalidConfiguration message ->
+                        return $"Configuration was not applied: {message}"
+                }
 
-                let! _ =
-                    interaction.FollowupAsync(response, ephemeral = true, allowedMentions = AllowedMentions.None)
-
-                ()
-            | _ ->
-                do!
-                    interaction.RespondAsync(
-                        "A designated starboard manager role is required in this guild.",
-                        ephemeral = true
-                    )
+            let! _ = interaction.FollowupAsync(response, ephemeral = true)
+            ()
         }
 
     {
         Name = "starboard"
-        Description = "Reload this guild's starboard configuration"
+        Description = "Reload this server's starboard configuration"
         Options =
             [
                 SlashCommandOptionBuilder()
@@ -51,5 +34,6 @@ let command (configuration: Runtime.ConfigurationStore) (guildId: uint64) (manag
                     .WithDescription("Apply the starboard JSON configuration from the database")
                     .WithType(ApplicationCommandOptionType.SubCommand)
             ]
+        Permission = Some GuildPermission.ManageGuild
         Handle = handle
     }

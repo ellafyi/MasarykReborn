@@ -28,11 +28,16 @@ let guildId =
 let log (message: LogMessage) : Task = task { printfn $"{message}" }
 
 let buildSlashCommand (input: Command) : SlashCommandProperties =
-    SlashCommandBuilder()
-        .WithName(input.Name)
-        .WithDescription(input.Description)
-        .AddOptions(List.toArray input.Options)
-        .Build()
+    let builder =
+        SlashCommandBuilder()
+            .WithName(input.Name)
+            .WithDescription(input.Description)
+            .AddOptions(List.toArray input.Options)
+
+    input.Permission
+    |> Option.iter (fun permission -> builder.WithDefaultMemberPermissions(permission) |> ignore)
+
+    builder.Build()
 
 let registerCommands (commands: Command list) (guild: SocketGuild) : Task =
     task {

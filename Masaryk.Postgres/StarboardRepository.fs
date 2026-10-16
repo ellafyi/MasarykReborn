@@ -1,362 +1,62 @@
 namespace Masaryk.Postgres
 
-open System
 open System.Threading.Tasks
 open Npgsql
-open Masaryk.Postgres.Starboard
 
-/// Load configuration, update board records, and save message captures.
+/// A message already on the starboard. Emoji is how Discord writes it: ⭐ or <:name:id>.
+type StarboardPost =
+    {
+        TargetChannelId: uint64
+        PostMessageId: uint64
+        Emoji: string
+        Count: int
+    }
+
 type StarboardRepository(dataSource: NpgsqlDataSource) =
-    /// Create a command using the connection pool. The SQL helpers dispose it.
-    let command (sql: string) : NpgsqlCommand = dataSource.CreateCommand(sql)
+    let command (sql: string) = dataSource.CreateCommand sql
 
-    /// Load the guild's configuration as JSON text, creating an empty list if needed.
-    /// Core parses and validates the JSON.
+    /// The guild's board list as JSON, creating an empty list if needed.
     member _.GetConfiguration(guildId: uint64) : Task<string> =
         task {
-            let values = [ box (decimal guildId) ]
-
-            do!
-                Sql.execute
-                    (command "INSERT INTO starboard_configuration (guild_id) VALUES ($1) ON CONFLICT DO NOTHING")
-                    values
-
             let! json =
                 Sql.scalar
-                    (command "SELECT configuration::text FROM starboard_configuration WHERE guild_id = $1")
-                    values
+                    (command
+                        """
+                        INSERT INTO starboard_configuration (guild_id) VALUES ($1)
+                        ON CONFLICT (guild_id) DO UPDATE SET guild_id = EXCLUDED.guild_id
+                        RETURNING configuration::text
+                        """)
+                    [ box (decimal guildId) ]
 
             return unbox<string> json
         }
 
-    /// Save the validated board list in one transaction and return each board's name and ID.
-    /// Keep IDs for existing names. Mark missing boards inactive and keep their captures.
-    /// Leave the configuration JSON unchanged.
-    member _.SynchronizeBoards(guildId: uint64, boards: BoardConfiguration list) : Task<Map<string, int64>> =
-        task {
-            use! connection = dataSource.OpenConnectionAsync()
-            use! transaction = connection.BeginTransactionAsync()
+    member _.Find(sourceMessageId: uint64) : Task<StarboardPost option> =
+        Sql.queryOne
+            (command
+                "SELECT target_channel_id, post_message_id, emoji, count FROM starboard_post WHERE source_message_id = $1")
+            [ box (decimal sourceMessageId) ]
+            (fun r ->
+                {
+                    TargetChannelId = uint64 (r.GetDecimal 0)
+                    PostMessageId = uint64 (r.GetDecimal 1)
+                    Emoji = r.GetString 2
+                    Count = r.GetInt32 3
+                })
 
-            /// Create a command using this transaction.
-            let command (sql: string) : NpgsqlCommand =
-                new NpgsqlCommand(sql, connection, transaction)
-
-            let sql =
-                """
-                INSERT INTO starboard (guild_id, name, destination_channel_id, reaction_threshold, is_active)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (guild_id, name) DO UPDATE SET
-                    destination_channel_id = EXCLUDED.destination_channel_id,
-                    reaction_threshold = EXCLUDED.reaction_threshold,
-                    is_active = EXCLUDED.is_active
-                RETURNING id
-                """
-
-            let ids = ResizeArray()
-
-            for board in boards do
-                let! id =
-                    Sql.scalar
-                        (command sql)
-                        [
-                            box (decimal guildId)
-                            box board.Name
-                            box (decimal board.Target)
-                            box board.Threshold
-                            box board.IsActive
-                        ]
-
-                ids.Add(board.Name, unbox<int64> id)
-
-            let names = boards |> List.map _.Name |> List.toArray
-
-            do!
-                Sql.execute
-                    (command "UPDATE starboard SET is_active = false WHERE guild_id = $1 AND NOT (name = ANY($2))")
-                    [ box (decimal guildId); box names ]
-
-            do! transaction.CommitAsync()
-            return ids |> Map.ofSeq
-        }
-
-    /// Check whether we already captured this message without loading its snapshot.
-    member _.HasEntry(sourceMessageId: uint64) : Task<bool> =
-        task {
-            let! exists =
-                Sql.scalar
-                    (command "SELECT EXISTS (SELECT 1 FROM starboard_entry WHERE source_message_id = $1)")
-                    [ box (decimal sourceMessageId) ]
-
-            return unbox<bool> exists
-        }
-
-    /// Save the entry, source channel, reactions, attachments, and embeds in one transaction.
-    /// Return Some entry ID, or None if a capture already exists for this message.
-    /// Keep existing captures unchanged. Roll back all inserts if a write fails.
-    member _.SaveSnapshot(snapshot: MessageSnapshot) : Task<int64 option> =
-        task {
-            use! connection = dataSource.OpenConnectionAsync()
-            use! transaction = connection.BeginTransactionAsync()
-
-            /// Create a command using this transaction.
-            let command (sql: string) : NpgsqlCommand =
-                new NpgsqlCommand(sql, connection, transaction)
-
-            /// Run a write in this transaction, binding values to $1, $2, etc.
-            let execute (sql: string) (values: obj seq) : Task<unit> = Sql.execute (command sql) values
-            // Store the thread's own ID when the message comes from a thread.
-            do!
-                execute
-                    "INSERT INTO source_channel (discord_channel_id) VALUES ($1) ON CONFLICT DO NOTHING"
-                    [ box (decimal snapshot.SourceChannelId) ]
-
-            let insertSql =
-                """
-            INSERT INTO starboard_entry
-                (starboard_id, source_channel_id, source_message_id, source_created_at,
-                 author_user_id, author_display_name, content_snapshot, source_jump_url,
-                 qualifying_emoji_key, qualifying_emoji_name, qualifying_count, author_avatar_url,
-                 reply_context_truncated)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            ON CONFLICT (source_message_id) DO NOTHING RETURNING id
-            """
-
-            let! result =
-                Sql.scalar
-                    (command insertSql)
-                    [
-                        box snapshot.BoardId
-                        box (decimal snapshot.SourceChannelId)
-                        box (decimal snapshot.SourceMessageId)
-                        box snapshot.SourceCreatedAt
-                        Sql.optional (Option.map decimal snapshot.AuthorUserId)
-                        box snapshot.AuthorDisplayName
-                        box snapshot.Content
-                        box snapshot.SourceJumpUrl
-                        box snapshot.QualifyingEmojiKey
-                        box snapshot.QualifyingEmojiName
-                        box snapshot.QualifyingCount
-                        Sql.optional snapshot.AuthorAvatarUrl
-                        box snapshot.RepliesTruncated
-                    ]
-
-            if isNull result then
-                return None
-            else
-                let entryId = unbox<int64> result
-
-                for reaction in snapshot.Reactions do
-                    do!
-                        execute
-                            "INSERT INTO entry_reaction (entry_id, emoji_key, emoji_name, count_snapshot) VALUES ($1, $2, $3, $4)"
-                            [
-                                box entryId
-                                box reaction.EmojiKey
-                                box reaction.EmojiName
-                                box reaction.RawCount
-                            ]
-
-                for position, attachment in List.indexed snapshot.Attachments do
-                    do!
-                        execute
-                            """
-                    INSERT INTO entry_attachment (entry_id, position, discord_attachment_id, filename, url, media_type, size_bytes)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    """
-                            [
-                                box entryId
-                                box position
-                                box (decimal attachment.Id)
-                                box attachment.Filename
-                                box attachment.Url
-                                Sql.optional attachment.MediaType
-                                Sql.optional attachment.SizeBytes
-                            ]
-
-                for position, metadata in List.indexed snapshot.Embeds do
-                    do!
-                        execute
-                            "INSERT INTO entry_embed (entry_id, position, metadata) VALUES ($1, $2, $3::jsonb)"
-                            [ box entryId; box position; box metadata ]
-
-                for position, reply in List.indexed snapshot.Replies do
-                    do!
-                        execute
-                            """
-                    INSERT INTO entry_reply
-                        (entry_id, position, source_channel_id, source_message_id,
-                         author_display_name, content_snapshot, source_jump_url)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    """
-                            [
-                                box entryId
-                                box position
-                                box (decimal reply.SourceChannelId)
-                                box (decimal reply.SourceMessageId)
-                                Sql.optional reply.AuthorDisplayName
-                                Sql.optional reply.Content
-                                box reply.SourceJumpUrl
-                            ]
-
-                do! transaction.CommitAsync()
-                return Some entryId
-        }
-
-    /// Record the destination and start a pending entry's send attempt before calling Discord.
-    /// Leave paused boards and entries with a previous attempt alone.
-    member _.BeginPublication(entryId: int64, channelId: uint64) : Task<bool> =
-        task {
-            let! claimed =
-                Sql.scalar
-                    (command
-                        """
-                        UPDATE starboard_entry
-                        SET archive_status = 'sending', publication_channel_id = $2,
-                            publication_started_at = now(), publication_error = NULL
-                        WHERE id = $1 AND archive_status = 'pending'
-                          AND EXISTS (SELECT 1 FROM starboard
-                                      WHERE starboard.id = starboard_entry.starboard_id AND is_active)
-                        RETURNING id
-                        """)
-                    [ box entryId; box (decimal channelId) ]
-
-            return not (isNull claimed)
-        }
-
-    /// Save the send outcome without changing the captured snapshot.
-    /// Keep posted entries terminal, including when someone later deletes the archive message.
-    member _.RecordPublication(entryId: int64, result: PublicationResult) : Task<unit> =
-        let status, messageId, error =
-            match result with
-            | PublicationResult.Posted id -> "posted", Some id, None
-            | PublicationResult.Failed error -> "failed", None, Some error
-            | PublicationResult.Uncertain error -> "uncertain", None, Some error
-
+    member _.Save(sourceMessageId: uint64, post: StarboardPost) : Task<unit> =
         Sql.execute
             (command
-                """
-                UPDATE starboard_entry
-                SET archive_status = $2, archive_message_id = $3,
-                    posted_at = CASE WHEN $2 = 'posted' THEN now() ELSE NULL END,
-                    publication_error = $4
-                WHERE id = $1 AND archive_status = 'sending'
-                """)
+                "INSERT INTO starboard_post (source_message_id, target_channel_id, post_message_id, emoji, count) VALUES ($1, $2, $3, $4, $5)")
             [
-                box entryId
-                box status
-                Sql.optional (Option.map decimal messageId)
-                Sql.optional error
+                box (decimal sourceMessageId)
+                box (decimal post.TargetChannelId)
+                box (decimal post.PostMessageId)
+                box post.Emoji
+                box post.Count
             ]
 
-    /// Find a capture by its source message ID and load its reactions, attachments, and embeds.
-    /// Return None if no capture exists. Keep attachments and embeds in their original order.
-    member _.FindEntry(sourceMessageId: uint64) : Task<Entry option> =
-        task {
-            use! connection = dataSource.OpenConnectionAsync()
-
-            /// Use the same connection for all parts of the capture.
-            let command (sql: string) : NpgsqlCommand = new NpgsqlCommand(sql, connection)
-
-            let sql =
-                """
-            SELECT id, captured_at, starboard_id, source_channel_id, source_message_id,
-                   source_created_at, author_user_id, author_display_name, content_snapshot,
-                   source_jump_url, qualifying_emoji_key, qualifying_emoji_name, qualifying_count,
-                   author_avatar_url, reply_context_truncated
-            FROM starboard_entry WHERE source_message_id = $1
-            """
-
-            let! entry =
-                Sql.queryOne (command sql) [ box (decimal sourceMessageId) ] (fun r ->
-                    {
-                        Id = r.GetInt64 0
-                        CapturedAt = r.GetDateTime 1
-                        Snapshot =
-                            {
-                                BoardId = r.GetInt64 2
-                                SourceChannelId = uint64 (r.GetDecimal 3)
-                                SourceMessageId = uint64 (r.GetDecimal 4)
-                                SourceCreatedAt = r.GetDateTime 5
-                                AuthorUserId = Sql.readOptional r 6 (fun i -> uint64 (r.GetDecimal i))
-                                AuthorDisplayName = r.GetString 7
-                                Content = r.GetString 8
-                                SourceJumpUrl = r.GetString 9
-                                QualifyingEmojiKey = r.GetString 10
-                                QualifyingEmojiName = r.GetString 11
-                                QualifyingCount = r.GetInt32 12
-                                AuthorAvatarUrl = Sql.readOptional r 13 r.GetString
-                                Reactions = []
-                                Attachments = []
-                                Embeds = []
-                                Replies = []
-                                RepliesTruncated = r.GetBoolean 14
-                            }
-                    })
-
-            match entry with
-            | None -> return None
-            | Some entry ->
-                let parameters = [ box entry.Id ]
-
-                let! reactions =
-                    Sql.query
-                        (command
-                            "SELECT emoji_key, emoji_name, count_snapshot FROM entry_reaction WHERE entry_id = $1 ORDER BY emoji_key")
-                        parameters
-                        (fun r ->
-                            {
-                                EmojiKey = r.GetString 0
-                                EmojiName = r.GetString 1
-                                RawCount = r.GetInt32 2
-                            })
-
-                let attachmentsSql =
-                    """
-                SELECT discord_attachment_id, filename, url, media_type, size_bytes
-                FROM entry_attachment WHERE entry_id = $1 ORDER BY position
-                """
-
-                let! attachments =
-                    Sql.query (command attachmentsSql) parameters (fun r ->
-                        {
-                            Id = uint64 (r.GetDecimal 0)
-                            Filename = r.GetString 1
-                            Url = r.GetString 2
-                            MediaType = Sql.readOptional r 3 r.GetString
-                            SizeBytes = Sql.readOptional r 4 r.GetInt64
-                        })
-
-                let! embeds =
-                    Sql.query
-                        (command "SELECT metadata::text FROM entry_embed WHERE entry_id = $1 ORDER BY position")
-                        parameters
-                        (fun r -> r.GetString 0)
-
-                let! replies =
-                    Sql.query
-                        (command
-                            """
-                            SELECT source_channel_id, source_message_id, author_display_name,
-                                   content_snapshot, source_jump_url
-                            FROM entry_reply WHERE entry_id = $1 ORDER BY position
-                            """)
-                        parameters
-                        (fun r ->
-                            {
-                                SourceChannelId = uint64 (r.GetDecimal 0)
-                                SourceMessageId = uint64 (r.GetDecimal 1)
-                                AuthorDisplayName = Sql.readOptional r 2 r.GetString
-                                Content = Sql.readOptional r 3 r.GetString
-                                SourceJumpUrl = r.GetString 4
-                            })
-
-                let snapshot =
-                    { entry.Snapshot with
-                        Reactions = reactions
-                        Attachments = attachments
-                        Embeds = embeds
-                        Replies = replies
-                    }
-
-                return Some { entry with Snapshot = snapshot }
-        }
+    member _.SetCount(sourceMessageId: uint64, count: int) : Task<unit> =
+        Sql.execute
+            (command "UPDATE starboard_post SET count = $2 WHERE source_message_id = $1")
+            [ box (decimal sourceMessageId); box count ]
