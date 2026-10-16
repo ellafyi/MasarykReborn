@@ -13,6 +13,7 @@ open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
 open Masaryk.Core.Services.Shared
+open Masaryk.Core
 open Masaryk.Postgres
 
 let private contextSize = 8
@@ -203,3 +204,17 @@ let subscribe (client: DiscordSocketClient) (guildId: uint64) (requests: Mailbox
         | _ -> ()
 
         Task.CompletedTask)
+
+let start: Feature =
+    fun context ->
+        match fromEnvironment () with
+        | None -> printfn "Chat: disabled; set LLM_API_URL to enable it."
+        | Some settings ->
+            let repository = ChatRepository(context.Database)
+
+            Worker.start
+                (fun (message: IUserMessage) -> $"Chat reply to {message.Channel.Id}/{message.Id}")
+                (fun message -> handle context.Client settings repository message)
+            |> subscribe context.Client context.GuildId
+
+        Task.FromResult []

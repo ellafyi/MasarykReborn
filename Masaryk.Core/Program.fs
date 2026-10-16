@@ -5,7 +5,6 @@ open System.Threading
 open System
 open Masaryk.Core
 open Masaryk.Core.Services
-open Masaryk.Core.Services.Shared
 
 let client =
     new DiscordSocketClient(
@@ -61,37 +60,22 @@ let slashCommandHandler (commandsByName: Map<string, Command>) (incomingCommand:
         | None -> do! incomingCommand.RespondAsync("unknown command")
     }
 
-let connect
-    (commands: Command list)
-    (configuration: Starboard.Runtime.ConfigurationStore)
-    (repository: Masaryk.Postgres.StarboardRepository)
-    (chat: (Chat.Settings * Masaryk.Postgres.ChatRepository) option)
-    (leaderboard: Masaryk.Postgres.LeaderboardRepository)
-    : Task<unit> =
+/// Adding a feature means adding it here.
+let features: Feature list =
+    [
+        Starboard.Feature.start
+        Bookmarks.start
+        Chat.start
+        Leaderboard.Feature.start
+    ]
+
+let run (context: Context) : Task<unit> =
     task {
-        use reactions =
-            Worker.start
-                (fun (reaction: Starboard.Events.ReactionEvent) ->
-                    $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
-                (fun reaction -> Starboard.Capture.handle repository client guildId configuration.Boards reaction)
+        let mutable commands = CommandRegistry.builtIn
 
-        use bookmarks =
-            Worker.start
-                (fun (request: Bookmarks.Request) ->
-                    $"Bookmark {request.Emote} for {request.ChannelId}/{request.MessageId}")
-                (fun request -> Bookmarks.handle client guildId request)
-
-        Starboard.DiscordAdapter.subscribe client guildId reactions
-        Bookmarks.subscribe client bookmarks
-
-        chat
-        |> Option.iter (fun (settings, chatRepository) ->
-            Worker.start
-                (fun (message: IUserMessage) -> $"Chat reply to {message.Channel.Id}/{message.Id}")
-                (fun message -> Chat.handle client settings chatRepository message)
-            |> Chat.subscribe client guildId)
-
-        Leaderboard.Counting.subscribe client guildId leaderboard
+        for start in features do
+            let! featureCommands = start context
+            commands <- commands @ featureCommands
 
         let commandsByName = CommandRegistry.byName commands
         client.add_Log (Func<LogMessage, Task>(log))
@@ -112,26 +96,14 @@ let connect
 [<EntryPoint>]
 let main (args: string array) : int =
     use database = Masaryk.Postgres.Database.fromEnvironment ()
-    let repository = Masaryk.Postgres.StarboardRepository(database)
-    use configuration = new Starboard.Runtime.ConfigurationStore(repository, guildId)
-    printfn $"%s{configuration.Reload().GetAwaiter().GetResult()}"
-    let managerRoleIds = Starboard.Configuration.managerRolesFromEnvironment ()
 
-    let leaderboard = Masaryk.Postgres.LeaderboardRepository(database)
-    let countingSince = leaderboard.StartCounting().GetAwaiter().GetResult()
-    printfn $"Leaderboard: counting messages since {countingSince:u}."
+    (run
+        {
+            Client = client
+            GuildId = guildId
+            Database = database
+        })
+        .GetAwaiter()
+        .GetResult()
 
-    let commands =
-        CommandRegistry.create
-            (Commands.Starboard.command configuration guildId managerRoleIds)
-            (Commands.Leaderboard.command leaderboard)
-
-    let chat =
-        Chat.fromEnvironment ()
-        |> Option.map (fun settings -> settings, Masaryk.Postgres.ChatRepository(database))
-
-    if chat.IsNone then
-        printfn "Chat: disabled; set LLM_API_URL to enable it."
-
-    (connect commands configuration repository chat leaderboard).GetAwaiter().GetResult()
     0

@@ -1,4 +1,4 @@
-module Masaryk.Core.Commands.Leaderboard
+module Masaryk.Core.Services.Leaderboard.SlashCommand
 
 open System
 open System.Collections.Concurrent

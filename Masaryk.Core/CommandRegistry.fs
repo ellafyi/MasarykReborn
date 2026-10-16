@@ -2,13 +2,8 @@ module Masaryk.Core.CommandRegistry
 
 open Masaryk.Core
 
-let create (starboardCommand: Command) (leaderboardCommand: Command) : Command list =
-    [
-        Commands.Cummy.command
-        Commands.Test.command
-        starboardCommand
-        leaderboardCommand
-    ]
+/// Commands that don't belong to a feature.
+let builtIn: Command list = [ Commands.Cummy.command; Commands.Test.command ]
 
 let byName (commands: Command list) : Map<string, Command> =
     commands

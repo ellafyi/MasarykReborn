@@ -1,4 +1,4 @@
-module Masaryk.Core.Commands.Starboard
+module Masaryk.Core.Services.Starboard.SlashCommand
 
 open System.Threading.Tasks
 open Discord

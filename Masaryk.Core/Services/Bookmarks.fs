@@ -7,6 +7,7 @@ open Discord
 open Discord.Net
 open Discord.WebSocket
 open Masaryk.Core.Services.Shared
+open Masaryk.Core
 
 /// :bookmark: from Discord's default emoji set.
 let private saveEmoji = "🔖"
@@ -128,3 +129,12 @@ let subscribe (client: DiscordSocketClient) (requests: MailboxProcessor<Request>
     client.add_ReactionAdded (
         Func<Cacheable<IUserMessage, uint64>, Cacheable<IMessageChannel, uint64>, SocketReaction, Task>(handler)
     )
+
+let start: Feature =
+    fun context ->
+        Worker.start
+            (fun (request: Request) -> $"Bookmark {request.Emote} for {request.ChannelId}/{request.MessageId}")
+            (fun request -> handle context.Client context.GuildId request)
+        |> subscribe context.Client
+
+        Task.FromResult []
