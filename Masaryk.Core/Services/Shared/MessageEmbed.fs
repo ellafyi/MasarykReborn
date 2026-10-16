@@ -115,7 +115,7 @@ let private spoilers (content: string) : string list =
     |> Seq.toList
 
 /// Build an embed with the author, time, text, every attachment link, and the first image.
-/// The footer starts with marker and says when text had to be shortened to fit.
+/// The footer shows marker, if any, and says when text had to be shortened to fit.
 let build (marker: string) (message: Message) : EmbedBuilder =
     let hidden = spoilers message.Content
 
@@ -153,10 +153,9 @@ let build (marker: string) (message: Message) : EmbedBuilder =
     let description = shorten contentLimit content + attachmentText
 
     let footer =
-        if shortened then
-            marker + " · Text shortened to fit Discord"
-        else
-            marker
+        [ marker; (if shortened then "Text shortened to fit Discord" else "") ]
+        |> List.filter ((<>) "")
+        |> String.concat " · "
 
     let embed =
         EmbedBuilder()
@@ -166,7 +165,9 @@ let build (marker: string) (message: Message) : EmbedBuilder =
             )
             .WithColor(Color.Gold)
             .WithTimestamp(DateTimeOffset(message.CreatedAt))
-            .WithFooter(footer)
+
+    if footer <> "" then
+        embed.WithFooter(footer) |> ignore
 
     if not (String.IsNullOrWhiteSpace description) then
         embed.WithDescription(description) |> ignore

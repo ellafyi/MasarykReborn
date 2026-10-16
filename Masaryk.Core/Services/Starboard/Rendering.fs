@@ -47,77 +47,39 @@ let private embedContent (json: string) : SourceEmbed =
         Url = text "url" root
     }
 
-/// One field per reply keeps a shortened code block or spoiler from swallowing the next reply.
-/// The newest replies are kept when Discord's total embed limit forces older ones out.
-let private replyContext (snapshot: MessageSnapshot) (budget: int) : Embed option =
-    if snapshot.Replies.IsEmpty && not snapshot.RepliesTruncated then
-        None
-    else
-        let title = "Reply context"
-        let omittedNotice = "Earlier replies omitted to fit Discord."
-        let truncatedNotice = "Reply chain truncated at capture."
-        // Reserve room for both notices so they always fit after the fields are chosen.
-        let mutable remaining =
-            budget - title.Length - omittedNotice.Length - truncatedNotice.Length - 1
+let private replyEmoji = "↪️"
 
-        let mutable fields = []
-        let mutable candidates = List.rev snapshot.Replies
-
-        while not candidates.IsEmpty do
-            let reply = candidates.Head
-
-            let name =
-                reply.AuthorDisplayName
-                |> Option.map (fun name -> Format.Sanitize(shorten 80 name))
-                |> Option.defaultValue "Unavailable reply"
-
-            let preview =
-                match reply.Content with
-                | None -> "*Deleted or inaccessible at capture.*"
-                | Some content when String.IsNullOrWhiteSpace content -> "*No text content.*"
-                | Some content -> shorten 300 content
-
-            // The link comes first so an unclosed code block in the preview can't hide it.
-            let value = $"[Jump to reply](<{reply.SourceJumpUrl}>)\n{preview}"
-            let size = name.Length + value.Length
-
-            if size > remaining || fields.Length = EmbedBuilder.MaxFieldCount then
-                candidates <- []
+let private chainLine (reply: ReplySnapshot) : string =
+    match reply.AuthorDisplayName, reply.Content with
+    | Some name, Some content ->
+        // Flattened, without code fences, so a cut-off message can't swallow the lines below it.
+        let text =
+            if String.IsNullOrWhiteSpace content then
+                "*no text*"
             else
-                fields <- (name, value) :: fields
-                remaining <- remaining - size
-                candidates <- candidates.Tail
+                content.Replace("```", "").ReplaceLineEndings(" ") |> shorten 200
 
-        let notices =
-            [
-                if fields.Length < snapshot.Replies.Length then
-                    omittedNotice
-                if snapshot.RepliesTruncated then
-                    truncatedNotice
-            ]
-
-        let embed = EmbedBuilder().WithTitle(title).WithColor(Color.Gold)
-
-        if not notices.IsEmpty then
-            embed.WithDescription(String.concat "\n" notices) |> ignore
-
-        for name, value in fields do
-            embed.AddField(name, value) |> ignore
-
-        Some(embed.Build())
+        $"[{Format.Sanitize(shorten 80 name)}]({reply.SourceJumpUrl}): {text}"
+    | _ -> $"[Deleted message]({reply.SourceJumpUrl})"
 
 /// Render one post, preserving attachment links and making any presentation limits visible.
 let create (entry: Entry) : Post =
     let snapshot = entry.Snapshot
 
+    let hasChain = not snapshot.Replies.IsEmpty || snapshot.RepliesTruncated
+
     let primary =
         MessageEmbed.build
-            $"Starboard entry {entry.Id}"
+            ""
             {
                 AuthorName = snapshot.AuthorDisplayName
                 AuthorAvatarUrl = snapshot.AuthorAvatarUrl
                 CreatedAt = snapshot.SourceCreatedAt
-                Content = snapshot.Content
+                Content =
+                    if hasChain then
+                        $"{replyEmoji} {snapshot.Content}"
+                    else
+                        snapshot.Content
                 Embeds = snapshot.Embeds |> List.map embedContent
                 Attachments =
                     snapshot.Attachments
@@ -130,6 +92,30 @@ let create (entry: Entry) : Post =
                         : Attachment))
             }
 
+    if hasChain then
+        // The starred message has priority; keep the newest replies that fit above it.
+        let room = EmbedBuilder.MaxDescriptionLength - primary.Description.Length
+        let lines = snapshot.Replies |> List.rev |> List.map chainLine
+
+        let fitting =
+            lines
+            |> List.scan (fun used line -> used + line.Length + 4) 2
+            |> List.tail
+            |> List.takeWhile (fun used -> used <= room)
+            |> List.length
+
+        let omitted =
+            if fitting < lines.Length || snapshot.RepliesTruncated then
+                [ "…" ]
+            else
+                []
+
+        let chain =
+            omitted @ List.rev (List.take fitting lines)
+            |> List.mapi (fun i line -> if i = 0 then line else $"{replyEmoji} {line}")
+
+        primary.Description <- String.concat "\n" (chain @ [ primary.Description ])
+
     let emoji =
         if snapshot.QualifyingEmojiKey.StartsWith("custom:") then
             let id = snapshot.QualifyingEmojiKey.Substring("custom:".Length)
@@ -140,14 +126,8 @@ let create (entry: Entry) : Post =
     primary.AddField("Reactions · Channel", $"{emoji} **{snapshot.QualifyingCount}** · <#{snapshot.SourceChannelId}>")
     |> ignore
 
-    let primary = primary.Build()
-    let context = replyContext snapshot (EmbedBuilder.MaxEmbedLength - primary.Length)
-
     {
-        Embeds =
-            match context with
-            | Some context -> [| context; primary |]
-            | None -> [| primary |]
+        Embeds = [| primary.Build() |]
         Components =
             ComponentBuilder()
                 .WithButton("Jump to message", style = ButtonStyle.Link, url = snapshot.SourceJumpUrl)

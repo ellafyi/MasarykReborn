@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />
+    <Content Include="Dockerfile" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Masaryk.Postgres/Masaryk.Postgres.fsproj" />
