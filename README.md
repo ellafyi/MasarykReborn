@@ -19,13 +19,13 @@ Commands don't have to work exactly the same way, they just need to cover the sa
 
 From the old bot:
 
-- [ ] Leaderboards for users and channels
+- [x] Leaderboards for users and channels
 - [ ] Message logging and backups
 - [ ] Course channels: search MUNI courses, join/leave them, get access to their channels
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels
-- [ ] Fun commands: emoji, avatars, server icon/banner, choose, hug, http.cat, emoji to ASCII art, etc.
+- [x] Fun commands: emoji, avatars, server icon/banner, choose, hug, yes/no answers, night sky, http.cat
 - [ ] Running code snippets (C, C++, Python, Haskell, APL)
 - [ ] Help, ping, uptime, server info
 - [ ] Admin commands (say, purge, sync, shutdown, logs)
