@@ -15,7 +15,7 @@ let private asset (name: string) =
 let private nightSky = asset "night_sky.txt"
 
 let private hugs =
-    (asset "hugs.txt").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+    (asset "hugs.txt").Split([| '\r'; '\n' |], StringSplitOptions.RemoveEmptyEntries)
 
 let private option (name: string) (description: string) (kind: ApplicationCommandOptionType) (required: bool) =
     SlashCommandOptionBuilder().WithName(name).WithDescription(description).WithType(kind).WithRequired(required)
