@@ -72,6 +72,7 @@ let features: Feature list =
         Bookmarks.start
         Chat.start
         Leaderboard.Feature.start
+        Fun.Feature.start
     ]
 
 let token () =
