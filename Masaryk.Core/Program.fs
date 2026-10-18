@@ -74,6 +74,7 @@ let features: Feature list =
         Leaderboard.Feature.start
         Fun.Feature.start
         Courses.Feature.start
+        Menu.Feature.start
     ]
 
 let token () =

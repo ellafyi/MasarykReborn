@@ -34,6 +34,11 @@
         <Compile Include="Services\Courses\Listing.fs" />
         <Compile Include="Services\Courses\SlashCommand.fs" />
         <Compile Include="Services\Courses\Feature.fs" />
+        <Compile Include="Services\Menu\Restaurants.fs" />
+        <Compile Include="Services\Menu\Parsing.fs" />
+        <Compile Include="Services\Menu\Fetching.fs" />
+        <Compile Include="Services\Menu\Rendering.fs" />
+        <Compile Include="Services\Menu\Feature.fs" />
         <Compile Include="Commands\Cummy.fs" />
         <Compile Include="Commands\Test.fs" />
         <Compile Include="CommandRegistry.fs" />

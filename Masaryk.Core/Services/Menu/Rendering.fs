@@ -1,0 +1,79 @@
+module Masaryk.Core.Services.Menu.Rendering
+
+open System
+open System.Globalization
+open Discord
+open Masaryk.Core.Services.Menu.Fetching
+
+/// Discord allows 6,000 characters across a message's embeds; five short menus fit.
+let pageSize = 5
+let private limit = 1000
+
+let pages (menus: Menus) =
+    max 1 ((menus.Menus.Length + pageSize - 1) / pageSize)
+
+let buttonId (page: int) = $"menu:{page}"
+
+let parseButton (id: string) : int option =
+    match id.Split(':') with
+    | [| "menu"; page |] ->
+        match Int32.TryParse page with
+        | true, page -> Some page
+        | _ -> None
+    | _ -> None
+
+let private price (value: decimal) =
+    value.ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',') + " Kč"
+
+/// Whole lines up to the limit, then an ellipsis.
+let private fit (lines: string list) =
+    let rec take used kept lines =
+        match lines with
+        | [] -> List.rev kept
+        | (line: string) :: rest when used + line.Length + 1 <= limit ->
+            take (used + line.Length + 1) (line :: kept) rest
+        | _ -> List.rev ("…" :: kept)
+
+    take 0 [] lines |> String.concat "\n"
+
+let describe (menu: Menu) : string =
+    match menu with
+    | Items [] -> "No menu today."
+    | Items items ->
+        items
+        |> List.map (fun item ->
+            let text = Format.Sanitize item.Text
+
+            match item.Price with
+            | Some value -> $"- {text} · *{price value}*"
+            | None -> $"- {text}")
+        |> fit
+    | Unavailable -> "Couldn't load the menu."
+    | LinkOnly -> "No menu online."
+
+let render (menus: Menus) (page: int) : string * Embed array * MessageComponent =
+    let count = pages menus
+    let page = Math.Clamp(page, 0, count - 1)
+
+    let embeds =
+        menus.Menus
+        |> List.skip (page * pageSize)
+        |> List.truncate pageSize
+        |> List.map (fun (restaurant, menu) ->
+            EmbedBuilder()
+                .WithTitle($"{restaurant.Icon} {restaurant.Name}")
+                .WithUrl(restaurant.Url)
+                .WithColor(Color(restaurant.Color))
+                .WithDescription(describe menu)
+                .Build())
+        |> List.toArray
+
+    let buttons =
+        ComponentBuilder()
+            .WithButton("◀", buttonId (page - 1), ButtonStyle.Secondary, disabled = (page = 0))
+            .WithButton("▶", buttonId (page + 1), ButtonStyle.Secondary, disabled = (page + 1 >= count))
+            .Build()
+
+    $"**Lunch near FI, {menus.Day.Day}. {menus.Day.Month}. {menus.Day.Year}** · page {page + 1} of {count}",
+    embeds,
+    buttons
