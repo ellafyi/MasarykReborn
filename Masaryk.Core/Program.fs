@@ -58,10 +58,18 @@ let clientReady (commands: Command list) () : Task =
     }
 
 
+/// A command's permission is only Discord's default; server settings can widen it, so check it here too.
+let allowed (command: Command) (interaction: SocketSlashCommand) =
+    match command.Permission, interaction.User with
+    | None, _ -> true
+    | Some permission, (:? SocketGuildUser as user) -> user.GuildPermissions.Has permission
+    | Some _, _ -> false
+
 let slashCommandHandler (commandsByName: Map<string, Command>) (incomingCommand: SocketSlashCommand) : Task =
     task {
         match Map.tryFind incomingCommand.CommandName commandsByName with
-        | Some command -> do! command.Handle incomingCommand
+        | Some command when allowed command incomingCommand -> do! command.Handle incomingCommand
+        | Some _ -> do! incomingCommand.RespondAsync("Only server administrators can use this.", ephemeral = true)
         | None -> do! incomingCommand.RespondAsync("unknown command")
     }
 

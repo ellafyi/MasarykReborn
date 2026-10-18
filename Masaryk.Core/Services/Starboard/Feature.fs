@@ -18,5 +18,5 @@ let start: Feature =
                 (fun reaction -> Capture.handle context.Client repository context.GuildId configuration.Boards reaction)
             |> DiscordAdapter.subscribe context.Client context.GuildId
 
-            return [ SlashCommand.command configuration ]
+            return [ SlashCommand.command context configuration repository ]
         }

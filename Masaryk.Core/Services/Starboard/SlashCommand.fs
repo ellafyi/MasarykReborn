@@ -2,38 +2,111 @@ module Masaryk.Core.Services.Starboard.SlashCommand
 
 open System.Threading.Tasks
 open Discord
+open Discord.Net
 open Discord.WebSocket
 open Masaryk.Core
 open Masaryk.Core.Services.Starboard
+open Masaryk.Postgres
 
-/// Server admins can change who may use this under Server Settings → Integrations.
-let command (configuration: Configuration.ConfigurationStore) : Command =
+let private reload (configuration: Configuration.ConfigurationStore) =
+    task {
+        try
+            return! configuration.Reload()
+        with Configuration.InvalidConfiguration message ->
+            return $"Configuration was not applied: {message}"
+    }
+
+let private summary (from: IChannel) (board: Board) (result: Import.Result) =
+    $"Starboard import from <#{from.Id}> into {board.Name}: read {result.Read} messages, found {result.Found} old posts, {result.Added} new."
+
+/// Progress is edited into the private reply.
+let private import
+    (context: Context)
+    (repository: StarboardRepository)
+    (interaction: SocketSlashCommand)
+    (from: IMessageChannel)
+    (board: Board)
+    =
+    task {
+        let show (text: string) =
+            interaction.ModifyOriginalResponseAsync(fun message -> message.Content <- text) :> Task
+
+        let progress (result: Import.Result) =
+            if result.Read % 500 = 0 then
+                show (summary from board result + " Still reading…")
+            else
+                Task.CompletedTask
+
+        try
+            let! result = Import.read repository context.GuildId from board.Target progress
+            do! show (summary from board result + " Done; their originals won't be posted again.")
+        with :? HttpException as error ->
+            do! show $"Starboard import from <#{from.Id}> stopped: {error.Reason}. Running it again continues safely."
+    }
+
+let command
+    (context: Context)
+    (configuration: Configuration.ConfigurationStore)
+    (repository: StarboardRepository)
+    : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
             do! interaction.DeferAsync(ephemeral = true)
+            let subcommand = Seq.head interaction.Data.Options
 
-            let! response =
-                task {
-                    try
-                        return! configuration.Reload()
-                    with Configuration.InvalidConfiguration message ->
-                        return $"Configuration was not applied: {message}"
-                }
+            if subcommand.Name = "import" then
+                let channel name =
+                    subcommand.Options |> Seq.find (fun o -> o.Name = name) |> _.Value :?> IChannel
 
-            let! _ = interaction.FollowupAsync(response, ephemeral = true)
-            ()
+                let from = channel "from"
+                let target = channel "to"
+                let boards = configuration.Boards |> List.filter _.IsActive
+
+                match boards |> List.tryFind (fun board -> board.Target = target.Id), from with
+                | Some board, (:? IMessageChannel as from) -> do! import context repository interaction from board
+                | _ ->
+                    let targets =
+                        boards
+                        |> List.map (fun board -> $"{board.Name} (<#{board.Target}>)")
+                        |> String.concat ", "
+
+                    let! _ =
+                        interaction.FollowupAsync(
+                            $"<#{target.Id}> isn't a starboard channel. Configured boards: {targets}.",
+                            ephemeral = true
+                        )
+
+                    ()
+            else
+                let! response = reload configuration
+                let! _ = interaction.FollowupAsync(response, ephemeral = true)
+                ()
         }
+
+    let channel (name: string) (description: string) =
+        SlashCommandOptionBuilder()
+            .WithName(name)
+            .WithDescription(description)
+            .WithType(ApplicationCommandOptionType.Channel)
+            .AddChannelType(ChannelType.Text)
+            .WithRequired(true)
 
     {
         Name = "starboard"
-        Description = "Reload this server's starboard configuration"
+        Description = "Manage this server's starboards"
         Options =
             [
                 SlashCommandOptionBuilder()
                     .WithName("reload")
                     .WithDescription("Apply the starboard JSON configuration from the database")
                     .WithType(ApplicationCommandOptionType.SubCommand)
+                SlashCommandOptionBuilder()
+                    .WithName("import")
+                    .WithDescription("Read the old bot's posts so their originals aren't posted again")
+                    .WithType(ApplicationCommandOptionType.SubCommand)
+                    .AddOption(channel "from" "A channel the old bot posted starboard messages in")
+                    .AddOption(channel "to" "The board's channel in this bot's configuration")
             ]
-        Permission = Some GuildPermission.ManageGuild
+        Permission = Some GuildPermission.Administrator
         Handle = handle
     }

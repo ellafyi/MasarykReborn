@@ -24,6 +24,7 @@
         <EmbeddedResource Include="Migrations/006_leaderboard.sql" />
         <EmbeddedResource Include="Migrations/007_starboard_posts.sql" />
         <EmbeddedResource Include="Migrations/008_course_channels.sql" />
+        <EmbeddedResource Include="Migrations/009_legacy_starboard_posts.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

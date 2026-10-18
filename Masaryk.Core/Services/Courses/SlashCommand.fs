@@ -213,6 +213,6 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                 subcommand "unlink" "Forget a course's channel" [ course () ]
                 subcommand "create" "Create a channel for a course" [ course () ]
             ]
-        Permission = Some GuildPermission.ManageChannels
+        Permission = Some GuildPermission.Administrator
         Handle = handle
     }

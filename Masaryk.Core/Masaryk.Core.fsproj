@@ -17,6 +17,7 @@
         <Compile Include="Services\Starboard\DiscordAdapter.fs" />
         <Compile Include="Services\Starboard\Rendering.fs" />
         <Compile Include="Services\Starboard\Capture.fs" />
+        <Compile Include="Services\Starboard\Import.fs" />
         <Compile Include="Services\Starboard\SlashCommand.fs" />
         <Compile Include="Services\Starboard\Feature.fs" />
         <Compile Include="Services\Bookmarks.fs" />

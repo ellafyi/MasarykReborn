@@ -105,7 +105,8 @@ let handle
     : Task<unit> =
     task {
         match! repository.Find reaction.MessageId with
-        | Some posted -> do! update client repository reaction posted
+        | Some(Posted posted) -> do! update client repository reaction posted
+        | Some Legacy -> ()
         | None when reaction.Added ->
             match! evaluate client guildId boards reaction with
             | Some(board, message, qualifying) -> do! post client repository board message qualifying
