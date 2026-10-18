@@ -5,7 +5,7 @@ open System
 open System.Net.Http
 open System.Threading
 open System.Threading.Tasks
-open Masaryk.Core.Services.Menu.Restaurants
+open Masaryk.Configuration
 
 type Menu =
     /// Today's items; none means no menu today.
@@ -57,8 +57,8 @@ let private lifetime = TimeSpan.FromMinutes 15.0
 let private gate = new SemaphoreSlim(1)
 let mutable private cached: Menus option = None
 
-/// Today's menus, fetched again when older than 15 minutes.
-let get () : Task<Menus> =
+/// Today's menus for these restaurants, fetched again when older than 15 minutes.
+let get (restaurants: Restaurant list) : Task<Menus> =
     task {
         do! gate.WaitAsync()
 
@@ -66,17 +66,22 @@ let get () : Task<Menus> =
             let day = today ()
 
             match cached with
-            | Some menus when menus.Day = day && DateTime.UtcNow - menus.Fetched < lifetime -> return menus
+            | Some menus when
+                menus.Day = day
+                && DateTime.UtcNow - menus.Fetched < lifetime
+                && List.map fst menus.Menus = restaurants
+                ->
+                return menus
             | _ ->
                 let lepsiMenu = lazy (http.GetStringAsync "https://www.lepsimenu.cz/api/menus")
 
-                let! menus = Restaurants.all |> List.map (fetch day lepsiMenu) |> Task.WhenAll
+                let! menus = restaurants |> List.map (fetch day lepsiMenu) |> Task.WhenAll
 
                 let fresh =
                     {
                         Day = day
                         Fetched = DateTime.UtcNow
-                        Menus = List.zip Restaurants.all (List.ofArray menus)
+                        Menus = List.zip restaurants (List.ofArray menus)
                     }
 
                 cached <- Some fresh

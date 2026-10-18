@@ -7,6 +7,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Masaryk.Core/Masaryk.Core.fsproj", "Masaryk.Core/"]
 COPY ["Masaryk.Postgres/Masaryk.Postgres.fsproj", "Masaryk.Postgres/"]
+COPY ["Masaryk.Configuration/Masaryk.Configuration.fsproj", "Masaryk.Configuration/"]
 RUN dotnet restore "Masaryk.Core/Masaryk.Core.fsproj"
 COPY . .
 WORKDIR "/src/Masaryk.Core"

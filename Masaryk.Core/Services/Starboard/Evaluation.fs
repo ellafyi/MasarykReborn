@@ -1,5 +1,6 @@
 module Masaryk.Core.Services.Starboard.Evaluation
 
+open Masaryk.Configuration
 open Masaryk.Core.Services.Starboard
 
 /// The active board for a channel (threads pass their parent). Targets are never sources.

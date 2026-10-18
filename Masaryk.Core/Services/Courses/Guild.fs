@@ -7,7 +7,7 @@ open Discord
 open Masaryk.Postgres
 
 /// Link every unlinked channel named after an unlinked catalog course.
-let matchChannels (repository: CourseRepository) (guild: IGuild) : Task<Channels.Matching> =
+let matchChannels (repository: CourseRepository) (home: string option) (guild: IGuild) : Task<Channels.Matching> =
     task {
         let! courses = repository.All()
         let! links = repository.Links()
@@ -26,7 +26,7 @@ let matchChannels (repository: CourseRepository) (guild: IGuild) : Task<Channels
         let linkedCourses =
             links |> List.filter (snd >> existing.Contains) |> List.map fst |> Set.ofList
 
-        let matching = Channels.matching courses linkedCourses candidates
+        let matching = Channels.matching home courses linkedCourses candidates
 
         for course, channel in matching.Links do
             do! repository.Link(course.Id, channel)
@@ -37,19 +37,18 @@ let matchChannels (repository: CourseRepository) (guild: IGuild) : Task<Channels
 /// The category a course channel belongs in: its current one when that is already one of the
 /// course's categories, else the first with room, created when missing.
 let private categoryFor
-    (repository: CourseRepository)
+    (home: string option)
     (guild: IGuild)
     (course: Course)
     (current: Nullable<uint64>)
     : Task<ICategoryChannel> =
     task {
-        let! assigned = repository.CategoryOverride(course.Id, course.Code)
-        let home = assigned |> Option.defaultValue (Channels.category course)
+        let wanted = Channels.category home course
         let! categories = guild.GetCategoriesAsync()
 
         match
             categories
-            |> Seq.tryFind (fun c -> Nullable c.Id = current && Channels.isOneOf home c.Name)
+            |> Seq.tryFind (fun c -> Nullable c.Id = current && Channels.isOneOf wanted c.Name)
         with
         | Some category -> return category
         | None ->
@@ -68,7 +67,7 @@ let private categoryFor
                     category.Name, Seq.length inside)
                 |> Map.ofSeq
 
-            let name = Channels.roomIn home sizes
+            let name = Channels.roomIn wanted sizes
 
             match categories |> Seq.tryFind (fun c -> c.Name = name) with
             | Some category -> return category
@@ -80,7 +79,7 @@ type Creation =
     | Exists of uint64
 
 /// Create the course's channel in its category, opening a numbered category when it is full.
-let create (repository: CourseRepository) (guild: IGuild) (course: Course) : Task<Creation> =
+let create (repository: CourseRepository) (home: string option) (guild: IGuild) (course: Course) : Task<Creation> =
     task {
         let! linked = repository.ChannelOf course.Id
 
@@ -91,11 +90,11 @@ let create (repository: CourseRepository) (guild: IGuild) (course: Course) : Tas
 
         match existing with
         | null ->
-            let! category = categoryFor repository guild course (Nullable())
+            let! category = categoryFor home guild course (Nullable())
 
             let! channel =
                 guild.CreateTextChannelAsync(
-                    Channels.name course,
+                    Channels.name home course,
                     fun properties ->
                         properties.CategoryId <- Optional(Nullable category.Id)
                         properties.Topic <- Channels.topic course
@@ -108,14 +107,14 @@ let create (repository: CourseRepository) (guild: IGuild) (course: Course) : Tas
 
 /// Link the course to the channel and move the channel into the course's category.
 /// Returns the category it moved to, or None if it was already in place.
-let link (repository: CourseRepository) (guild: IGuild) (course: Course) (channelId: uint64) =
+let link (repository: CourseRepository) (home: string option) (guild: IGuild) (course: Course) (channelId: uint64) =
     task {
         do! repository.Link(course.Id, channelId)
         let! channel = guild.GetChannelAsync channelId
 
         match channel with
         | :? INestedChannel as nested ->
-            let! category = categoryFor repository guild course nested.CategoryId
+            let! category = categoryFor home guild course nested.CategoryId
 
             if nested.CategoryId = Nullable category.Id then
                 return None

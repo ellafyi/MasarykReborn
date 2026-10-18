@@ -8,15 +8,19 @@ let start: Feature =
     fun context ->
         task {
             let repository = StarboardRepository(context.Database)
-            let configuration = Configuration.ConfigurationStore(repository, context.GuildId)
-            let! loaded = configuration.Reload()
-            printfn $"{loaded}"
+            printfn $"Starboard: {context.Configuration.Current.Boards.Length} boards."
 
             Worker.start
                 (fun (reaction: DiscordAdapter.ReactionEvent) ->
                     $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
-                (fun reaction -> Capture.handle context.Client repository context.GuildId configuration.Boards reaction)
+                (fun reaction ->
+                    Capture.handle
+                        context.Client
+                        repository
+                        context.GuildId
+                        context.Configuration.Current.Boards
+                        reaction)
             |> DiscordAdapter.subscribe context.Client context.GuildId
 
-            return [ SlashCommand.command context configuration repository ]
+            return [ SlashCommand.command context repository ]
         }

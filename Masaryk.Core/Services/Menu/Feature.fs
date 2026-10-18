@@ -5,21 +5,21 @@ open System.Threading.Tasks
 open Discord.WebSocket
 open Masaryk.Core
 
-let private show (interaction: SocketSlashCommand) : Task =
+let private show (context: Context) (interaction: SocketSlashCommand) : Task =
     task {
         do! interaction.DeferAsync()
-        let! menus = Fetching.get ()
+        let! menus = Fetching.get context.Configuration.Current.Restaurants
         let content, embeds, buttons = Rendering.render menus 0
         let! _ = interaction.FollowupAsync(content, embeds = embeds, components = buttons)
         ()
     }
 
-let private turnPage (interaction: SocketMessageComponent) : Task =
+let private turnPage (context: Context) (interaction: SocketMessageComponent) : Task =
     task {
         match Rendering.parseButton interaction.Data.CustomId with
         | Some page ->
             do! interaction.DeferAsync()
-            let! menus = Fetching.get ()
+            let! menus = Fetching.get context.Configuration.Current.Restaurants
             let content, embeds, buttons = Rendering.render menus page
 
             let! _ =
@@ -35,7 +35,7 @@ let private turnPage (interaction: SocketMessageComponent) : Task =
 let start: Feature =
     fun context ->
         task {
-            context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(turnPage))
+            context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(turnPage context))
 
             return
                 [
@@ -44,7 +44,7 @@ let start: Feature =
                         Description = "Today's lunch menus near FI"
                         Options = []
                         Permission = None
-                        Handle = show
+                        Handle = show context
                     }
                 ]
         }

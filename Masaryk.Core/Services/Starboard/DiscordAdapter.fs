@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
+open Masaryk.Configuration
 open Masaryk.Core.Services.Shared
 open Masaryk.Core.Services.Starboard
 

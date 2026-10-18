@@ -7,13 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="ConfigurationStore.fs" />
         <Compile Include="Command.fs" />
         <Compile Include="Services\Shared\MessageEmbed.fs" />
         <Compile Include="Services\Shared\Worker.fs" />
         <Compile Include="Services\Shared\Replies.fs" />
+        <Compile Include="Services\Config.fs" />
         <Compile Include="Services\Starboard\Domain.fs" />
         <Compile Include="Services\Starboard\Evaluation.fs" />
-        <Compile Include="Services\Starboard\Configuration.fs" />
         <Compile Include="Services\Starboard\DiscordAdapter.fs" />
         <Compile Include="Services\Starboard\Rendering.fs" />
         <Compile Include="Services\Starboard\Capture.fs" />
@@ -35,7 +36,6 @@
         <Compile Include="Services\Courses\Listing.fs" />
         <Compile Include="Services\Courses\SlashCommand.fs" />
         <Compile Include="Services\Courses\Feature.fs" />
-        <Compile Include="Services\Menu\Restaurants.fs" />
         <Compile Include="Services\Menu\Parsing.fs" />
         <Compile Include="Services\Menu\Fetching.fs" />
         <Compile Include="Services\Menu\Rendering.fs" />
@@ -57,6 +57,7 @@
 
     <ItemGroup>
         <PackageReference Include="Discord.Net" Version="3.20.1" />
+        <ProjectReference Include="..\Masaryk.Configuration\Masaryk.Configuration.fsproj" />
         <ProjectReference Include="..\Masaryk.Postgres\Masaryk.Postgres.fsproj" />
     </ItemGroup>
 

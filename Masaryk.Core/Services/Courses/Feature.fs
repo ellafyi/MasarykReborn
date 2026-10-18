@@ -12,8 +12,11 @@ let start: Feature =
         task {
             let repository = CourseRepository(context.Database)
 
+            let home () =
+                context.Configuration.Current.HomeFaculty
+
             context.Client.add_AutocompleteExecuted (
-                Func<SocketAutocompleteInteraction, Task>(SlashCommand.autocomplete repository)
+                Func<SocketAutocompleteInteraction, Task>(SlashCommand.autocomplete repository home)
             )
 
             context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(SlashCommand.turnPage repository))
@@ -21,5 +24,5 @@ let start: Feature =
             let guild () =
                 context.Client.GetGuild context.GuildId :> IGuild
 
-            return [ SlashCommand.command repository guild ]
+            return [ SlashCommand.command repository guild home ]
         }

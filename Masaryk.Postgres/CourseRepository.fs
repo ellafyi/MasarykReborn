@@ -89,9 +89,6 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
             let! _ =
                 run "INSERT INTO faculty (code) SELECT DISTINCT faculty_code FROM incoming ON CONFLICT DO NOTHING" []
 
-            let! _ =
-                run "DELETE FROM incoming WHERE faculty_code IN (SELECT code FROM faculty WHERE NOT sync_enabled)" []
-
             let! imports =
                 run
                     "INSERT INTO catalog_import (faculty_code, term, source_label) SELECT DISTINCT faculty_code, term, $1 FROM incoming"
@@ -291,25 +288,4 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
                     [ box courseId ]
 
             return removed > 0
-        }
-
-    /// The category an administrator assigned to this course or the longest matching code prefix.
-    member _.CategoryOverride(courseId: int64, code: string) : Task<string option> =
-        task {
-            let! name =
-                Sql.scalar
-                    (dataSource.CreateCommand
-                        """
-                        SELECT coalesce(
-                            (SELECT category_name FROM course_category_override WHERE course_id = $1),
-                            (SELECT category_name FROM family_category_override
-                             WHERE $2 ILIKE course_prefix || '%'
-                             ORDER BY length(course_prefix) DESC LIMIT 1))
-                        """)
-                    [ box courseId; box code ]
-
-            return
-                match name with
-                | :? string as name -> Some name
-                | _ -> None
         }

@@ -10,10 +10,10 @@ open Masaryk.Postgres
 let private name = "courses"
 
 /// Autocomplete values are `FACULTY:CODE`; a bare code means the home faculty.
-let private find (repository: CourseRepository) (value: string) =
+let private find (repository: CourseRepository) (home: string option) (value: string) =
     match value.Split(':', 2) with
     | [| faculty; code |] -> repository.Find(faculty.Trim(), code.Trim())
-    | _ -> repository.Find(Channels.home, value.Trim())
+    | _ -> repository.Find(Option.defaultValue "" home, value.Trim())
 
 let private cut (length: int) (text: string) =
     if text.Length > length then
@@ -21,7 +21,11 @@ let private cut (length: int) (text: string) =
     else
         text
 
-let autocomplete (repository: CourseRepository) (interaction: SocketAutocompleteInteraction) : Task =
+let autocomplete
+    (repository: CourseRepository)
+    (home: unit -> string option)
+    (interaction: SocketAutocompleteInteraction)
+    : Task =
     task {
         if interaction.Data.CommandName = name then
             let typed = string interaction.Data.Current.Value
@@ -36,7 +40,7 @@ let autocomplete (repository: CourseRepository) (interaction: SocketAutocomplete
 
                 do! interaction.RespondAsync(results)
             else
-                let! courses = repository.Search(typed, Channels.home)
+                let! courses = repository.Search(typed, Option.defaultValue "" (home ()))
 
                 let results =
                     courses
@@ -91,10 +95,11 @@ let private report (matching: Channels.Matching) =
     |> String.concat "\n\n"
     |> cut 2000
 
-let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
+let command (repository: CourseRepository) (guild: unit -> IGuild) (home: unit -> string option) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
             let subcommand = Seq.head interaction.Data.Options
+            let home = home ()
 
             let option name =
                 subcommand.Options |> Seq.tryFind (fun o -> o.Name = name) |> Option.map _.Value
@@ -104,7 +109,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                     do! interaction.DeferAsync()
                     let value = option "course" |> Option.map string |> Option.defaultValue ""
 
-                    match! find repository value with
+                    match! find repository home value with
                     | Some course -> do! act course
                     | None -> do! interaction.FollowupAsync($"There's no course {value} in the catalog.") :> Task
                 }
@@ -116,7 +121,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                 do! interaction.RespondAsync(embed = embed, components = buttons, ephemeral = true)
             | "match" ->
                 do! interaction.DeferAsync()
-                let! matching = Guild.matchChannels repository (guild ())
+                let! matching = Guild.matchChannels repository home (guild ())
                 let! _ = interaction.FollowupAsync(report matching)
                 ()
             | "link" ->
@@ -125,7 +130,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                 do!
                     withCourse (fun course ->
                         task {
-                            let! moved = Guild.link repository (guild ()) course channel.Id
+                            let! moved = Guild.link repository home (guild ()) course channel.Id
 
                             let text =
                                 match moved with
@@ -157,7 +162,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                         task {
                             let! text =
                                 task {
-                                    match! Guild.create repository (guild ()) course with
+                                    match! Guild.create repository home (guild ()) course with
                                     | Guild.Created channel -> return $"Created <#{channel.Id}>."
                                     | Guild.Exists id -> return $"{course.Code} already has <#{id}>."
                                 }

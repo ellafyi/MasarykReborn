@@ -22,22 +22,6 @@ type StarboardRecord =
 type StarboardRepository(dataSource: NpgsqlDataSource) =
     let command (sql: string) = dataSource.CreateCommand sql
 
-    /// The guild's board list as JSON, creating an empty list if needed.
-    member _.GetConfiguration(guildId: uint64) : Task<string> =
-        task {
-            let! json =
-                Sql.scalar
-                    (command
-                        """
-                        INSERT INTO starboard_configuration (guild_id) VALUES ($1)
-                        ON CONFLICT (guild_id) DO UPDATE SET guild_id = EXCLUDED.guild_id
-                        RETURNING configuration::text
-                        """)
-                    [ box (decimal guildId) ]
-
-            return unbox<string> json
-        }
-
     member _.Find(sourceMessageId: uint64) : Task<StarboardRecord option> =
         Sql.queryOne
             (command

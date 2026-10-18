@@ -21,6 +21,8 @@ type Context =
         Client: DiscordSocketClient
         GuildId: uint64
         Database: NpgsqlDataSource
+        /// Read `Current` at use time; it changes when someone saves a new revision.
+        Configuration: ConfigurationStore
     }
 
 /// Starts a feature: it subscribes to the events it needs and returns its slash commands.

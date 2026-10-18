@@ -3,6 +3,8 @@ open Discord.WebSocket
 open System.Threading.Tasks
 open System.Threading
 open System
+open Npgsql
+open Masaryk.Postgres
 open Masaryk.Core
 open Masaryk.Core.Services
 
@@ -83,6 +85,7 @@ let features: Feature list =
         Fun.Feature.start
         Courses.Feature.start
         Menu.Feature.start
+        Config.start
     ]
 
 let token () =
@@ -93,8 +96,22 @@ let token () =
 
     value
 
-let run (context: Context) : Task<unit> =
+let run (database: NpgsqlDataSource) : Task<unit> =
     task {
+        let repository = ConfigurationRepository(database)
+        let configuration = ConfigurationStore(repository, guildId)
+        do! configuration.Reload()
+        printfn $"Configuration version {configuration.Version} loaded."
+        repository.Listen(fun () -> configuration.Reload() |> ignore) |> ignore
+
+        let context =
+            {
+                Client = client
+                GuildId = guildId
+                Database = database
+                Configuration = configuration
+            }
+
         let mutable commands = CommandRegistry.builtIn
 
         for start in features do
@@ -119,13 +136,7 @@ let main (args: string array) : int =
         match args with
         | [| "import-history" |] -> Leaderboard.Import.run database guildId (token ())
         | [| "import-courses"; path |] -> Courses.Import.run database path
-        | _ ->
-            run
-                {
-                    Client = client
-                    GuildId = guildId
-                    Database = database
-                }
+        | _ -> run database
 
     work.GetAwaiter().GetResult()
     0

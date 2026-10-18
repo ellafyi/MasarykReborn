@@ -4,9 +4,6 @@ module Masaryk.Core.Services.Courses.Channels
 open System
 open Masaryk.Postgres
 
-/// Courses of this faculty get channels without a faculty prefix.
-let home = "FI"
-
 /// The old bot's naming: look-alike characters keep what Discord would strip,
 /// and an en dash inside the name keeps the first hyphen as the end of the code.
 let sanitize (name: string) : string =
@@ -24,9 +21,10 @@ let sanitize (name: string) : string =
         .Replace(":", "꞉")
         .Replace("?", "？")
 
-let name (course: Course) : string =
+/// Home faculty courses (see the `courses.homeFaculty` setting) have no faculty prefix.
+let name (home: string option) (course: Course) : string =
     let full =
-        if course.Faculty = home then
+        if Some course.Faculty = home then
             sanitize $"{course.Code} {course.Name}"
         else
             sanitize $"{course.Faculty}:{course.Code} {course.Name}"
@@ -34,11 +32,11 @@ let name (course: Course) : string =
     if full.Length > 100 then full[..99] else full
 
 /// The faculty and code a channel name starts with, if it has the course channel form.
-let code (channel: string) : (string * string) option =
+let code (home: string option) (channel: string) : (string * string) option =
     let start = channel.Split('-')[0]
 
     match start.Split('꞉') with
-    | [| code |] when code <> "" -> Some(home, code)
+    | [| code |] when code <> "" -> home |> Option.map (fun home -> home, code)
     | [| faculty; code |] when faculty <> "" && code <> "" -> Some(faculty, code)
     | _ -> None
 
@@ -63,10 +61,9 @@ let topic (course: Course) : string =
     | true, slug -> $"{course.Name} · https://is.muni.cz/predmet/{slug}/{course.Code}"
     | _ -> course.Name
 
-/// Without an override, courses sit in a category named by the code's leading letters,
-/// or by faculty outside the home faculty.
-let category (course: Course) : string =
-    if course.Faculty = home then
+/// Courses sit in a category named by the code's leading letters, or by faculty outside the home faculty.
+let category (home: string option) (course: Course) : string =
+    if Some course.Faculty = home then
         let letters = course.Code |> Seq.takeWhile Char.IsLetter |> Seq.toArray |> String
 
         if letters = "" then
@@ -106,7 +103,12 @@ let private key (faculty: string, code: string) =
 
 /// Match unlinked channels to unlinked courses by the code their name starts with.
 /// Only names that start with letters followed by a digit count as course-like.
-let matching (courses: Course list) (linked: Set<int64>) (channels: (uint64 * string) list) : Matching =
+let matching
+    (home: string option)
+    (courses: Course list)
+    (linked: Set<int64>)
+    (channels: (uint64 * string) list)
+    : Matching =
     let byCode = courses |> List.map (fun c -> key (c.Faculty, c.Code), c) |> Map.ofList
 
     let courseLike (_, code: string) =
@@ -115,7 +117,7 @@ let matching (courses: Course list) (linked: Set<int64>) (channels: (uint64 * st
     let found =
         channels
         |> List.choose (fun (id, name) ->
-            code name
+            code home name
             |> Option.filter courseLike
             |> Option.map (fun c -> id, name, Map.tryFind (key c) byCode))
 

@@ -1,26 +1,5 @@
-/// Lunch places near FI, taken from HungryBot (github.com/roseckyj/HungryBot).
-module Masaryk.Core.Services.Menu.Restaurants
-
-type Source =
-    /// A restaurant page on menicka.cz.
-    | Menicka of id: int
-    /// A restaurant in the lepsimenu.cz API.
-    | LepsiMenu of id: string
-    /// A Wolt venue; only menu categories whose slug contains the given text count.
-    | Wolt of slug: string * category: string
-    /// Táo's own weekly menu page.
-    | Tao
-    /// No menu online, just a link.
-    | Link
-
-type Restaurant =
-    {
-        Name: string
-        Icon: string
-        Color: uint32
-        Url: string
-        Source: Source
-    }
+/// What a setting is when the configuration doesn't mention it.
+module Masaryk.Configuration.Defaults
 
 let private menicka id name icon color =
     {
@@ -31,7 +10,8 @@ let private menicka id name icon color =
         Source = Menicka id
     }
 
-let all: Restaurant list =
+/// Lunch places near FI, taken from HungryBot (github.com/roseckyj/HungryBot).
+let restaurants: Restaurant list =
     [
         menicka 4116 "Padagali" "🍛" 0xf15850u
         {
@@ -103,3 +83,11 @@ let all: Restaurant list =
             Source = Link
         }
     ]
+
+let configuration: Configuration =
+    {
+        LogChannel = None
+        Boards = []
+        HomeFaculty = Some "FI"
+        Restaurants = restaurants
+    }

@@ -13,6 +13,7 @@
         <Compile Include="LeaderboardRepository.fs"/>
         <Compile Include="LegacyImport.fs"/>
         <Compile Include="CourseRepository.fs"/>
+        <Compile Include="ConfigurationRepository.fs"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -25,6 +26,8 @@
         <EmbeddedResource Include="Migrations/007_starboard_posts.sql" />
         <EmbeddedResource Include="Migrations/008_course_channels.sql" />
         <EmbeddedResource Include="Migrations/009_legacy_starboard_posts.sql" />
+        <EmbeddedResource Include="Migrations/010_guild_settings.sql" />
+        <EmbeddedResource Include="Migrations/011_configuration.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

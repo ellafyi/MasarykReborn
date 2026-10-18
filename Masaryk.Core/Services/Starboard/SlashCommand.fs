@@ -4,22 +4,16 @@ open System.Threading.Tasks
 open Discord
 open Discord.Net
 open Discord.WebSocket
+open Masaryk.Configuration
 open Masaryk.Core
+open Masaryk.Core.Services
 open Masaryk.Core.Services.Starboard
 open Masaryk.Postgres
-
-let private reload (configuration: Configuration.ConfigurationStore) =
-    task {
-        try
-            return! configuration.Reload()
-        with Configuration.InvalidConfiguration message ->
-            return $"Configuration was not applied: {message}"
-    }
 
 let private summary (from: IChannel) (board: Board) (result: Import.Result) =
     $"Starboard import from <#{from.Id}> into {board.Name}: read {result.Read} messages, found {result.Found} old posts, {result.Added} new."
 
-/// Progress is edited into the private reply.
+/// Progress goes to the log channel when one is set, otherwise to the private reply.
 let private import
     (context: Context)
     (repository: StarboardRepository)
@@ -28,8 +22,24 @@ let private import
     (board: Board)
     =
     task {
-        let show (text: string) =
-            interaction.ModifyOriginalResponseAsync(fun message -> message.Content <- text) :> Task
+        let! show =
+            match Config.logChannel context with
+            | Some log ->
+                task {
+                    let! status =
+                        log.SendMessageAsync($"Starboard import from <#{from.Id}> into {board.Name}: starting.")
+
+                    let! _ =
+                        interaction.FollowupAsync(
+                            $"Reading <#{from.Id}>; progress is in <#{log.Id}>.",
+                            ephemeral = true
+                        )
+
+                    return fun (text: string) -> status.ModifyAsync(fun message -> message.Content <- text)
+                }
+            | None ->
+                Task.FromResult(fun (text: string) ->
+                    interaction.ModifyOriginalResponseAsync(fun message -> message.Content <- text) :> Task)
 
         let progress (result: Import.Result) =
             if result.Read % 500 = 0 then
@@ -44,42 +54,33 @@ let private import
             do! show $"Starboard import from <#{from.Id}> stopped: {error.Reason}. Running it again continues safely."
     }
 
-let command
-    (context: Context)
-    (configuration: Configuration.ConfigurationStore)
-    (repository: StarboardRepository)
-    : Command =
+let command (context: Context) (repository: StarboardRepository) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
             do! interaction.DeferAsync(ephemeral = true)
             let subcommand = Seq.head interaction.Data.Options
 
-            if subcommand.Name = "import" then
-                let channel name =
-                    subcommand.Options |> Seq.find (fun o -> o.Name = name) |> _.Value :?> IChannel
+            let channel name =
+                subcommand.Options |> Seq.find (fun o -> o.Name = name) |> _.Value :?> IChannel
 
-                let from = channel "from"
-                let target = channel "to"
-                let boards = configuration.Boards |> List.filter _.IsActive
+            let from = channel "from"
+            let target = channel "to"
+            let boards = context.Configuration.Current.Boards |> List.filter _.IsActive
 
-                match boards |> List.tryFind (fun board -> board.Target = target.Id), from with
-                | Some board, (:? IMessageChannel as from) -> do! import context repository interaction from board
-                | _ ->
-                    let targets =
-                        boards
-                        |> List.map (fun board -> $"{board.Name} (<#{board.Target}>)")
-                        |> String.concat ", "
+            match boards |> List.tryFind (fun board -> board.Target = target.Id), from with
+            | Some board, (:? IMessageChannel as from) -> do! import context repository interaction from board
+            | _ ->
+                let targets =
+                    boards
+                    |> List.map (fun board -> $"{board.Name} (<#{board.Target}>)")
+                    |> String.concat ", "
 
-                    let! _ =
-                        interaction.FollowupAsync(
-                            $"<#{target.Id}> isn't a starboard channel. Configured boards: {targets}.",
-                            ephemeral = true
-                        )
+                let! _ =
+                    interaction.FollowupAsync(
+                        $"<#{target.Id}> isn't a starboard channel. Boards in `/config`: {targets}.",
+                        ephemeral = true
+                    )
 
-                    ()
-            else
-                let! response = reload configuration
-                let! _ = interaction.FollowupAsync(response, ephemeral = true)
                 ()
         }
 
@@ -96,10 +97,6 @@ let command
         Description = "Manage this server's starboards"
         Options =
             [
-                SlashCommandOptionBuilder()
-                    .WithName("reload")
-                    .WithDescription("Apply the starboard JSON configuration from the database")
-                    .WithType(ApplicationCommandOptionType.SubCommand)
                 SlashCommandOptionBuilder()
                     .WithName("import")
                     .WithDescription("Read the old bot's posts so their originals aren't posted again")
