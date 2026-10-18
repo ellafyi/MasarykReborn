@@ -12,6 +12,7 @@
         <Compile Include="ChatRepository.fs"/>
         <Compile Include="LeaderboardRepository.fs"/>
         <Compile Include="LegacyImport.fs"/>
+        <Compile Include="CourseRepository.fs"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -22,6 +23,7 @@
         <EmbeddedResource Include="Migrations/005_llm_reply.sql" />
         <EmbeddedResource Include="Migrations/006_leaderboard.sql" />
         <EmbeddedResource Include="Migrations/007_starboard_posts.sql" />
+        <EmbeddedResource Include="Migrations/008_course_channels.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

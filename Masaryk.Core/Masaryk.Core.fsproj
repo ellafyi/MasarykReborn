@@ -27,6 +27,12 @@
         <Compile Include="Services\Leaderboard\Import.fs" />
         <Compile Include="Services\Leaderboard\Feature.fs" />
         <Compile Include="Services\Fun\Feature.fs" />
+        <Compile Include="Services\Courses\Export.fs" />
+        <Compile Include="Services\Courses\Import.fs" />
+        <Compile Include="Services\Courses\Channels.fs" />
+        <Compile Include="Services\Courses\Guild.fs" />
+        <Compile Include="Services\Courses\SlashCommand.fs" />
+        <Compile Include="Services\Courses\Feature.fs" />
         <Compile Include="Commands\Cummy.fs" />
         <Compile Include="Commands\Test.fs" />
         <Compile Include="CommandRegistry.fs" />

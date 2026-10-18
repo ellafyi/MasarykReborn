@@ -73,6 +73,7 @@ let features: Feature list =
         Chat.start
         Leaderboard.Feature.start
         Fun.Feature.start
+        Courses.Feature.start
     ]
 
 let token () =
@@ -108,6 +109,7 @@ let main (args: string array) : int =
     let work =
         match args with
         | [| "import-history" |] -> Leaderboard.Import.run database guildId (token ())
+        | [| "import-courses"; path |] -> Courses.Import.run database path
         | _ ->
             run
                 {

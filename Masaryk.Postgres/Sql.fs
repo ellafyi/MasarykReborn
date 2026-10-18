@@ -39,6 +39,13 @@ let execute (command: NpgsqlCommand) (values: obj seq) : Task<unit> =
         return ()
     }
 
+/// Run a SQL statement and return how many rows it changed.
+let affected (command: NpgsqlCommand) (values: obj seq) : Task<int> =
+    task {
+        use command = prepare command values
+        return! command.ExecuteNonQueryAsync()
+    }
+
 /// Call read for each result row and return the results as a list.
 /// Return [] if no rows match. Dispose the reader and command when done.
 let query (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) : Task<'T list> =

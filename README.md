@@ -21,7 +21,7 @@ From the old bot:
 
 - [x] Leaderboards for users and channels
 - [ ] Message logging and backups
-- [ ] Course channels: search MUNI courses, join/leave them, get access to their channels
+- [ ] Course channels: search MUNI courses, join/leave them, get access to their channels (catalog import and channel creation done)
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels
