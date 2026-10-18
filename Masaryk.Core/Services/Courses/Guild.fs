@@ -34,6 +34,47 @@ let matchChannels (repository: CourseRepository) (guild: IGuild) : Task<Channels
         return matching
     }
 
+/// The category a course channel belongs in: its current one when that is already one of the
+/// course's categories, else the first with room, created when missing.
+let private categoryFor
+    (repository: CourseRepository)
+    (guild: IGuild)
+    (course: Course)
+    (current: Nullable<uint64>)
+    : Task<ICategoryChannel> =
+    task {
+        let! assigned = repository.CategoryOverride(course.Id, course.Code)
+        let home = assigned |> Option.defaultValue (Channels.category course)
+        let! categories = guild.GetCategoriesAsync()
+
+        match
+            categories
+            |> Seq.tryFind (fun c -> Nullable c.Id = current && Channels.isOneOf home c.Name)
+        with
+        | Some category -> return category
+        | None ->
+            let! channels = guild.GetChannelsAsync()
+
+            let sizes =
+                categories
+                |> Seq.map (fun category ->
+                    let inside =
+                        channels
+                        |> Seq.filter (fun c ->
+                            match c with
+                            | :? INestedChannel as nested -> nested.CategoryId = Nullable category.Id
+                            | _ -> false)
+
+                    category.Name, Seq.length inside)
+                |> Map.ofSeq
+
+            let name = Channels.roomIn home sizes
+
+            match categories |> Seq.tryFind (fun c -> c.Name = name) with
+            | Some category -> return category
+            | None -> return! guild.CreateCategoryAsync name
+    }
+
 type Creation =
     | Created of ITextChannel
     | Exists of uint64
@@ -50,30 +91,7 @@ let create (repository: CourseRepository) (guild: IGuild) (course: Course) : Tas
 
         match existing with
         | null ->
-            let! assigned = repository.CategoryOverride(course.Id, course.Code)
-            let! categories = guild.GetCategoriesAsync()
-            let! channels = guild.GetChannelsAsync()
-
-            let sizes =
-                categories
-                |> Seq.map (fun category ->
-                    let inside =
-                        channels
-                        |> Seq.filter (fun c ->
-                            match c with
-                            | :? INestedChannel as nested -> nested.CategoryId = Nullable category.Id
-                            | _ -> false)
-
-                    category.Name, Seq.length inside)
-                |> Map.ofSeq
-
-            let name =
-                Channels.roomIn (assigned |> Option.defaultValue (Channels.category course)) sizes
-
-            let! category =
-                match categories |> Seq.tryFind (fun c -> c.Name = name) with
-                | Some category -> Task.FromResult category
-                | None -> guild.CreateCategoryAsync name
+            let! category = categoryFor repository guild course (Nullable())
 
             let! channel =
                 guild.CreateTextChannelAsync(
@@ -86,4 +104,23 @@ let create (repository: CourseRepository) (guild: IGuild) (course: Course) : Tas
             do! repository.Link(course.Id, channel.Id)
             return Created channel
         | channel -> return Exists channel.Id
+    }
+
+/// Link the course to the channel and move the channel into the course's category.
+/// Returns the category it moved to, or None if it was already in place.
+let link (repository: CourseRepository) (guild: IGuild) (course: Course) (channelId: uint64) =
+    task {
+        do! repository.Link(course.Id, channelId)
+        let! channel = guild.GetChannelAsync channelId
+
+        match channel with
+        | :? INestedChannel as nested ->
+            let! category = categoryFor repository guild course nested.CategoryId
+
+            if nested.CategoryId = Nullable category.Id then
+                return None
+            else
+                do! nested.ModifyAsync(fun properties -> properties.CategoryId <- Optional(Nullable category.Id))
+                return Some category
+        | _ -> return None
     }

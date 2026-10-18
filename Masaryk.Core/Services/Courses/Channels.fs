@@ -84,6 +84,13 @@ let roomIn (name: string) (sizes: Map<string, int>) : string =
     Seq.initInfinite (fun i -> if i = 0 then name else $"{name} {i + 1}")
     |> Seq.find (fun candidate -> Map.tryFind candidate sizes |> Option.defaultValue 0 < categorySize)
 
+/// Whether `category` is `name` or one of its numbered overflow categories.
+let isOneOf (name: string) (category: string) : bool =
+    category = name
+    || category.StartsWith(name + " ")
+       && category.Length > name.Length + 1
+       && Seq.forall Char.IsDigit (category.Substring(name.Length + 1))
+
 type Matching =
     {
         /// Course and channel pairs to link.

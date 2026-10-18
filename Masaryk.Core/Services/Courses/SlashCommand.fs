@@ -125,8 +125,15 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                 do!
                     withCourse (fun course ->
                         task {
-                            do! repository.Link(course.Id, channel.Id)
-                            let! _ = interaction.FollowupAsync($"Linked {course.Code} to <#{channel.Id}>.")
+                            let! moved = Guild.link repository (guild ()) course channel.Id
+
+                            let text =
+                                match moved with
+                                | Some category ->
+                                    $"Linked {course.Code} to <#{channel.Id}> and moved it to {category.Name}."
+                                | None -> $"Linked {course.Code} to <#{channel.Id}>."
+
+                            let! _ = interaction.FollowupAsync(text)
                             ()
                         })
             | "unlink" ->
