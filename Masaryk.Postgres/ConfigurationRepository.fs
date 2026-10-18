@@ -11,21 +11,13 @@ type ConfigurationSave =
 
 /// Revisions of each guild's configuration document, stored as given.
 type ConfigurationRepository(dataSource: NpgsqlDataSource) =
-    /// The newest revision's number and document; revision 0 means none was saved yet.
-    member _.Latest(guildId: uint64) : Task<int64 * string option> =
-        task {
-            let! found =
-                Sql.queryOne
-                    (dataSource.CreateCommand
-                        "SELECT id, document::text FROM configuration_revision WHERE guild_id = $1 ORDER BY id DESC LIMIT 1")
-                    [ box (decimal guildId) ]
-                    (fun r -> r.GetInt64 0, r.GetString 1)
-
-            return
-                match found with
-                | Some(version, document) -> version, Some document
-                | None -> 0L, None
-        }
+    /// The newest revision's number and document.
+    member _.Latest(guildId: uint64) : Task<(int64 * string) option> =
+        Sql.queryOne
+            (dataSource.CreateCommand
+                "SELECT id, document::text FROM configuration_revision WHERE guild_id = $1 ORDER BY id DESC LIMIT 1")
+            [ box (decimal guildId) ]
+            (fun r -> r.GetInt64 0, r.GetString 1)
 
     /// Save a new revision if `basedOn` is still the newest one.
     member _.Save(guildId: uint64, basedOn: int64, document: string, savedBy: uint64) : Task<ConfigurationSave> =
@@ -33,8 +25,7 @@ type ConfigurationRepository(dataSource: NpgsqlDataSource) =
             use! connection = dataSource.OpenConnectionAsync()
             use! transaction = connection.BeginTransactionAsync()
 
-            let command (sql: string) =
-                new NpgsqlCommand(sql, connection, transaction)
+            let command = Sql.command transaction
 
             do! Sql.execute (command "LOCK TABLE configuration_revision IN EXCLUSIVE MODE") []
 

@@ -22,6 +22,10 @@ let prepare (command: NpgsqlCommand) (values: obj seq) : NpgsqlCommand =
 
     command
 
+/// A command that runs inside the transaction.
+let command (transaction: NpgsqlTransaction) (sql: string) =
+    new NpgsqlCommand(sql, transaction.Connection, transaction)
+
 /// Run the query and return its first value, such as an ID from INSERT ... RETURNING.
 /// Return null if no rows match. Dispose the command when done.
 let scalar (command: NpgsqlCommand) (values: obj seq) : Task<obj> =

@@ -11,8 +11,6 @@ let run (database: NpgsqlDataSource) (path: string) : Task<unit> =
         let! html = File.ReadAllTextAsync path
         let courses = Export.parse html
         printfn $"Read {courses.Length} courses from {path}."
-        let! changes = CourseRepository(database).Import(Path.GetFileName path, courses)
-
-        printfn
-            $"Recorded {changes.Imports} faculty terms: {changes.Added} new, {changes.Changed} changed, {changes.Removed} no longer listed."
+        let! added, renamed = CourseRepository(database).Import courses
+        printfn $"{added} new, {renamed} renamed."
     }

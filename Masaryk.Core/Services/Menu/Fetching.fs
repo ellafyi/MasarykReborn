@@ -25,9 +25,6 @@ let private http =
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; MasarykBOT)")
     client
 
-let today () : DateOnly =
-    DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Europe/Prague"))
-
 let private fetch (day: DateOnly) (lepsiMenu: Lazy<Task<string>>) (restaurant: Restaurant) : Task<Menu> =
     task {
         try
@@ -53,7 +50,6 @@ let private fetch (day: DateOnly) (lepsiMenu: Lazy<Task<string>>) (restaurant: R
             return Unavailable
     }
 
-let private lifetime = TimeSpan.FromMinutes 15.0
 let private gate = new SemaphoreSlim(1)
 let mutable private cached: Menus option = None
 
@@ -63,12 +59,13 @@ let get (restaurants: Restaurant list) : Task<Menus> =
         do! gate.WaitAsync()
 
         try
-            let day = today ()
+            let day =
+                DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Europe/Prague"))
 
             match cached with
             | Some menus when
                 menus.Day = day
-                && DateTime.UtcNow - menus.Fetched < lifetime
+                && DateTime.UtcNow - menus.Fetched < TimeSpan.FromMinutes 15.0
                 && List.map fst menus.Menus = restaurants
                 ->
                 return menus

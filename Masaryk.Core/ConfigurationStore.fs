@@ -16,9 +16,8 @@ type ConfigurationStore(repository: ConfigurationRepository, guildId: uint64) =
         task {
             try
                 match! repository.Latest guildId with
-                | 0L, _
-                | _, None -> state <- 0L, Defaults.configuration
-                | version, Some document ->
+                | None -> state <- 0L, Defaults.configuration
+                | Some(version, document) ->
                     match Document.read document with
                     | Ok(_, configuration) -> state <- version, configuration
                     | Error problems ->

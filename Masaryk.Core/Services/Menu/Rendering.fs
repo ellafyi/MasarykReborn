@@ -4,22 +4,17 @@ open System
 open System.Globalization
 open Discord
 open Masaryk.Core.Services.Menu.Fetching
+open Masaryk.Core.Services.Shared
 
 /// Discord allows 6,000 characters across a message's embeds; five short menus fit.
 let pageSize = 5
 let private limit = 1000
 
-let pages (menus: Menus) =
-    max 1 ((menus.Menus.Length + pageSize - 1) / pageSize)
-
 let buttonId (page: int) = $"menu:{page}"
 
 let parseButton (id: string) : int option =
     match id.Split(':') with
-    | [| "menu"; page |] ->
-        match Int32.TryParse page with
-        | true, page -> Some page
-        | _ -> None
+    | [| "menu"; page |] -> Some(int page)
     | _ -> None
 
 let private price (value: decimal) =
@@ -52,7 +47,7 @@ let describe (menu: Menu) : string =
     | LinkOnly -> "No menu online."
 
 let render (menus: Menus) (page: int) : string * Embed array * MessageComponent =
-    let count = pages menus
+    let count = Pager.count pageSize (int64 menus.Menus.Length)
     let page = Math.Clamp(page, 0, count - 1)
 
     let embeds =
@@ -68,12 +63,6 @@ let render (menus: Menus) (page: int) : string * Embed array * MessageComponent 
                 .Build())
         |> List.toArray
 
-    let buttons =
-        ComponentBuilder()
-            .WithButton("◀", buttonId (page - 1), ButtonStyle.Secondary, disabled = (page = 0))
-            .WithButton("▶", buttonId (page + 1), ButtonStyle.Secondary, disabled = (page + 1 >= count))
-            .Build()
-
     $"**Lunch near FI, {menus.Day.Day}. {menus.Day.Month}. {menus.Day.Year}** · page {page + 1} of {count}",
     embeds,
-    buttons
+    Pager.buttons buttonId page count

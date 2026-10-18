@@ -23,11 +23,13 @@ let sanitize (name: string) : string =
 
 /// Home faculty courses (see the `courses.homeFaculty` setting) have no faculty prefix.
 let name (home: string option) (course: Course) : string =
-    let full =
+    let prefix =
         if Some course.Faculty = home then
-            sanitize $"{course.Code} {course.Name}"
+            ""
         else
-            sanitize $"{course.Faculty}:{course.Code} {course.Name}"
+            course.Faculty + ":"
+
+    let full = sanitize $"{prefix}{course.Code} {course.Name}"
 
     if full.Length > 100 then full[..99] else full
 
@@ -123,24 +125,20 @@ let matching
 
     let claims =
         found
-        |> List.choose (fun (id, name, course) -> course |> Option.map (fun c -> c, (id, name)))
-        |> List.filter (fun (course, _) -> not (linked.Contains course.Id))
-        |> List.groupBy (fst >> _.Id)
-        |> List.map (fun (_, group) -> fst group.Head, List.map snd group)
+        |> List.choose (fun (id, name, course) ->
+            course
+            |> Option.filter (fun c -> not (linked.Contains c.Id))
+            |> Option.map (fun c -> c, (id, name)))
+        |> List.groupBy fst
+        |> List.map (fun (course, group) -> course, List.map snd group)
+
+    let single, contested =
+        claims |> List.partition (fun (_, channels) -> channels.Length = 1)
 
     {
-        Links =
-            claims
-            |> List.choose (fun (course, channels) ->
-                match channels with
-                | [ id, _ ] -> Some(course, id)
-                | _ -> None)
+        Links = single |> List.map (fun (course, channels) -> course, fst channels.Head)
         Unknown =
             found
-            |> List.filter (fun (_, _, c) -> c.IsNone)
-            |> List.map (fun (_, name, _) -> name)
-        Contested =
-            claims
-            |> List.filter (fun (_, channels) -> channels.Length > 1)
-            |> List.map (fun (course, channels) -> course, List.map snd channels)
+            |> List.choose (fun (_, name, course) -> if course.IsNone then Some name else None)
+        Contested = contested |> List.map (fun (course, channels) -> course, List.map snd channels)
     }

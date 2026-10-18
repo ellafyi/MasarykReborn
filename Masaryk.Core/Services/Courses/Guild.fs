@@ -57,14 +57,11 @@ let private categoryFor
             let sizes =
                 categories
                 |> Seq.map (fun category ->
-                    let inside =
-                        channels
-                        |> Seq.filter (fun c ->
-                            match c with
-                            | :? INestedChannel as nested -> nested.CategoryId = Nullable category.Id
-                            | _ -> false)
-
-                    category.Name, Seq.length inside)
+                    category.Name,
+                    channels
+                    |> Seq.sumBy (function
+                        | :? INestedChannel as c when c.CategoryId = Nullable category.Id -> 1
+                        | _ -> 0))
                 |> Map.ofSeq
 
             let name = Channels.roomIn wanted sizes

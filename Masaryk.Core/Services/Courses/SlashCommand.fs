@@ -5,6 +5,8 @@ open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
 open Masaryk.Core
+open Masaryk.Core.Options
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
 let private name = "courses"
@@ -14,12 +16,6 @@ let private find (repository: CourseRepository) (home: string option) (value: st
     match value.Split(':', 2) with
     | [| faculty; code |] -> repository.Find(faculty.Trim(), code.Trim())
     | _ -> repository.Find(Option.defaultValue "" home, value.Trim())
-
-let private cut (length: int) (text: string) =
-    if text.Length > length then
-        text[.. length - 2] + "…"
-    else
-        text
 
 let autocomplete
     (repository: CourseRepository)
@@ -33,21 +29,24 @@ let autocomplete
             if interaction.Data.Current.Name = "faculty" then
                 let! faculties = repository.Faculties()
 
-                let results =
-                    faculties
-                    |> List.filter _.StartsWith(typed, StringComparison.OrdinalIgnoreCase)
-                    |> List.map (fun f -> AutocompleteResult(f, f))
-
-                do! interaction.RespondAsync(results)
+                do!
+                    interaction.RespondAsync(
+                        faculties
+                        |> List.filter _.StartsWith(typed, StringComparison.OrdinalIgnoreCase)
+                        |> List.map (fun f -> AutocompleteResult(f, f))
+                    )
             else
                 let! courses = repository.Search(typed, Option.defaultValue "" (home ()))
 
-                let results =
-                    courses
-                    |> List.map (fun c ->
-                        AutocompleteResult(cut 100 $"{c.Faculty}:{c.Code} {c.Name}", $"{c.Faculty}:{c.Code}"))
-
-                do! interaction.RespondAsync(results)
+                do!
+                    interaction.RespondAsync(
+                        courses
+                        |> List.map (fun c ->
+                            AutocompleteResult(
+                                MessageEmbed.shorten 100 $"{c.Faculty}:{c.Code} {c.Name}",
+                                $"{c.Faculty}:{c.Code}"
+                            ))
+                    )
     }
 
 let private page (repository: CourseRepository) (faculty: string option) (number: int) =
@@ -93,99 +92,69 @@ let private report (matching: Channels.Matching) =
             $"Not in the catalog: {list matching.Unknown}"
     ]
     |> String.concat "\n\n"
-    |> cut 2000
+    |> MessageEmbed.shorten 2000
 
 let command (repository: CourseRepository) (guild: unit -> IGuild) (home: unit -> string option) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
-            let subcommand = Seq.head interaction.Data.Options
+            let subcommand, value = input interaction
             let home = home ()
 
-            let option name =
-                subcommand.Options |> Seq.tryFind (fun o -> o.Name = name) |> Option.map _.Value
-
-            let withCourse (act: Course -> Task) =
+            let withCourse (answer: Course -> Task<string>) =
                 task {
                     do! interaction.DeferAsync()
-                    let value = option "course" |> Option.map string |> Option.defaultValue ""
+                    let code = string (value "course").Value
+                    let! course = find repository home code
 
-                    match! find repository home value with
-                    | Some course -> do! act course
-                    | None -> do! interaction.FollowupAsync($"There's no course {value} in the catalog.") :> Task
+                    let! text =
+                        match course with
+                        | Some course -> answer course
+                        | None -> Task.FromResult $"There's no course {code} in the catalog."
+
+                    do! interaction.FollowupAsync(text) :> Task
                 }
 
-            match subcommand.Name with
+            match subcommand with
             | "list" ->
-                let faculty = option "faculty" |> Option.map string
-                let! embed, buttons = page repository faculty 0
+                let! embed, buttons = page repository (value "faculty" |> Option.map string) 0
                 do! interaction.RespondAsync(embed = embed, components = buttons, ephemeral = true)
             | "match" ->
                 do! interaction.DeferAsync()
                 let! matching = Guild.matchChannels repository home (guild ())
-                let! _ = interaction.FollowupAsync(report matching)
-                ()
+                do! interaction.FollowupAsync(report matching) :> Task
             | "link" ->
-                let channel = (option "channel").Value :?> IChannel
+                let channel = (value "channel").Value :?> IChannel
 
                 do!
                     withCourse (fun course ->
                         task {
-                            let! moved = Guild.link repository home (guild ()) course channel.Id
-
-                            let text =
-                                match moved with
-                                | Some category ->
-                                    $"Linked {course.Code} to <#{channel.Id}> and moved it to {category.Name}."
-                                | None -> $"Linked {course.Code} to <#{channel.Id}>."
-
-                            let! _ = interaction.FollowupAsync(text)
-                            ()
+                            match! Guild.link repository home (guild ()) course channel.Id with
+                            | Some category ->
+                                return $"Linked {course.Code} to <#{channel.Id}> and moved it to {category.Name}."
+                            | None -> return $"Linked {course.Code} to <#{channel.Id}>."
                         })
             | "unlink" ->
                 do!
                     withCourse (fun course ->
                         task {
-                            let! removed = repository.Unlink course.Id
-
-                            let text =
-                                if removed then
-                                    $"{course.Code} is no longer linked to a channel."
-                                else
-                                    $"{course.Code} wasn't linked to a channel."
-
-                            let! _ = interaction.FollowupAsync(text)
-                            ()
+                            match! repository.Unlink course.Id with
+                            | true -> return $"{course.Code} is no longer linked to a channel."
+                            | false -> return $"{course.Code} wasn't linked to a channel."
                         })
             | _ ->
                 do!
                     withCourse (fun course ->
                         task {
-                            let! text =
-                                task {
-                                    match! Guild.create repository home (guild ()) course with
-                                    | Guild.Created channel -> return $"Created <#{channel.Id}>."
-                                    | Guild.Exists id -> return $"{course.Code} already has <#{id}>."
-                                }
-
-                            let! _ = interaction.FollowupAsync(text)
-                            ()
+                            match! Guild.create repository home (guild ()) course with
+                            | Guild.Created channel -> return $"Created <#{channel.Id}>."
+                            | Guild.Exists id -> return $"{course.Code} already has <#{id}>."
                         })
         }
 
     let course () =
-        SlashCommandOptionBuilder()
-            .WithName("course")
-            .WithDescription("Course code, such as IB002")
-            .WithType(ApplicationCommandOptionType.String)
+        (option "course" "Course code, such as IB002" ApplicationCommandOptionType.String)
             .WithRequired(true)
             .WithAutocomplete(true)
-
-    let subcommand (name: string) (description: string) (options: SlashCommandOptionBuilder list) =
-        SlashCommandOptionBuilder()
-            .WithName(name)
-            .WithDescription(description)
-            .WithType(ApplicationCommandOptionType.SubCommand)
-            .AddOptions(List.toArray options)
 
     {
         Name = name
@@ -196,25 +165,14 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) (home: unit -
                     "list"
                     "Courses in the catalog"
                     [
-                        SlashCommandOptionBuilder()
-                            .WithName("faculty")
-                            .WithDescription("Only this faculty's courses, such as FI")
-                            .WithType(ApplicationCommandOptionType.String)
+                        (option "faculty" "Only this faculty's courses, such as FI" ApplicationCommandOptionType.String)
                             .WithAutocomplete(true)
                     ]
                 subcommand "match" "Link channels named after courses in the catalog" []
                 subcommand
                     "link"
                     "Link a course to an existing channel"
-                    [
-                        course ()
-                        SlashCommandOptionBuilder()
-                            .WithName("channel")
-                            .WithDescription("The course's channel")
-                            .WithType(ApplicationCommandOptionType.Channel)
-                            .AddChannelType(ChannelType.Text)
-                            .WithRequired(true)
-                    ]
+                    [ course (); textChannel "channel" "The course's channel" ]
                 subcommand "unlink" "Forget a course's channel" [ course () ]
                 subcommand "create" "Create a channel for a course" [ course () ]
             ]

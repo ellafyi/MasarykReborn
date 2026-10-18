@@ -26,7 +26,7 @@ From the old bot:
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels
-- [x] Fun commands: emoji, avatars, server icon/banner, choose, hug, yes/no answers, night sky, http.cat
+- [x] Fun commands: emoji, avatars, server icon/banner, http.cat
 - [ ] Running code snippets (C, C++, Python, Haskell, APL)
 - [ ] Help, ping, uptime, server info
 - [ ] Admin commands (say, purge, sync, shutdown, logs)

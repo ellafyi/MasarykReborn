@@ -3,17 +3,14 @@ module Masaryk.Core.Services.Menu.Parsing
 
 open System
 open System.Globalization
-open System.Net
 open System.Text
 open System.Text.Json
 open System.Text.RegularExpressions
+open Masaryk.Core.Services.Shared
 
 type Item = { Text: string; Price: decimal option }
 
 let private options = RegexOptions.Singleline ||| RegexOptions.IgnoreCase
-
-let private tags = Regex("<[^>]+>")
-let private spaces = Regex(@"\s+")
 
 /// Leading `1)`, `M2:`, `Pondělí:` and similar numbering.
 let private numbering =
@@ -24,24 +21,17 @@ let private numbering =
 /// Dot runs and ellipses Táo uses as separators.
 let private dots = Regex(@"\s*(\.{2,}|…+)[.…]*\s*")
 
-let private plain (html: string) =
-    spaces.Replace(WebUtility.HtmlDecode(tags.Replace(html, " ")), " ").Trim()
-
 let private withoutEmoji (text: string) =
-    let kept =
-        text.EnumerateRunes()
-        |> Seq.filter (fun rune ->
-            Rune.GetUnicodeCategory rune <> UnicodeCategory.OtherSymbol
-            && rune.Value <> 0xFE0F
-            && not (rune.Value >= 0x1F1E6 && rune.Value <= 0x1F1FF))
-        |> Seq.map string
+    text.EnumerateRunes()
+    |> Seq.filter (fun rune ->
+        Rune.GetUnicodeCategory rune <> UnicodeCategory.OtherSymbol
+        && rune.Value <> 0xFE0F)
+    |> Seq.map string
+    |> String.concat ""
 
-    String.Concat kept
-
-let cleanup (text: string) : string =
-    let text = spaces.Replace(withoutEmoji (plain text), " ").Trim()
-    let text = numbering.Replace(text, "")
-    spaces.Replace(dots.Replace(text, " "), " ").Trim(' ', ',', '.', ';')
+let private cleanup (text: string) : string =
+    let text = numbering.Replace((withoutEmoji (Html.plain text)).Trim(), "")
+    (Html.squeeze (dots.Replace(text, " "))).Trim(' ', ',', '.', ';')
 
 let private czechNumber (text: string) =
     match Decimal.TryParse(text.Replace(" ", "").Replace(',', '.'), CultureInfo.InvariantCulture) with
@@ -69,32 +59,18 @@ let private menickaOrder = Regex("<span class='poradi'>.*?</span>", options)
 let menicka (today: DateOnly) (html: string) : Item list =
     menickaDays.Matches(html)
     |> Seq.map _.Groups[1].Value
-    |> Seq.tryFind (fun day ->
-        let title = menickaTitle.Match(day)
-        title.Success && dates title.Groups[1].Value = [ today ])
-    |> Option.map (fun day ->
-        menickaItems.Matches(day)
-        |> Seq.choose (fun item ->
-            let item = item.Groups[1].Value
-            let name = menickaName.Match(item)
+    |> Seq.filter (fun day -> dates (menickaTitle.Match(day).Groups[1].Value) = [ today ])
+    |> Seq.truncate 1
+    |> Seq.collect (fun day -> menickaItems.Matches day)
+    |> Seq.map (fun item ->
+        let item = item.Groups[1].Value
 
-            if name.Success then
-                let price = menickaPrice.Match(item)
-
-                Some
-                    {
-                        Text = cleanup (menickaOrder.Replace(name.Groups[1].Value, ""))
-                        Price =
-                            if price.Success then
-                                czechNumber ((plain price.Groups[1].Value).Replace("Kč", ""))
-                            else
-                                None
-                    }
-            else
-                None)
-        |> Seq.filter (fun item -> item.Text <> "")
-        |> Seq.toList)
-    |> Option.defaultValue []
+        {
+            Text = cleanup (menickaOrder.Replace(menickaName.Match(item).Groups[1].Value, ""))
+            Price = czechNumber ((Html.plain (menickaPrice.Match(item).Groups[1].Value)).Replace("Kč", ""))
+        })
+    |> Seq.filter (fun item -> item.Text <> "")
+    |> Seq.toList
 
 let lepsiMenu (id: string) (json: string) : Item list =
     use document = JsonDocument.Parse json
@@ -147,30 +123,24 @@ let private taoItems =
 let private taoPrice = Regex(@"(\d[\d ]*)\s*[Kk][čc]\u030C?\.?")
 
 let private taoWeek =
-    Regex(@"(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})\s*[-–]\s*(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})")
+    Regex(@"\d{1,2}\.\s*\d{1,2}\.\s*\d{4}\s*[-–]\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{4}")
 
 let private weekdays = [ "pondělí"; "úterý"; "středa"; "čtvrtek"; "pátek" ]
 
 /// The weekly menus (numbered) and today's daily one, if the page is for this week.
 let tao (today: DateOnly) (html: string) : Item list =
     let current =
-        let week = taoWeek.Match(plain html)
+        match dates (taoWeek.Match(Html.plain html).Value) with
+        | [ first; last ] -> first <= today && today <= last
+        | _ -> true
 
-        not week.Success
-        || (match dates week.Groups[1].Value, dates week.Groups[2].Value with
-            | [ first ], [ last ] -> first <= today && today <= last
-            | _ -> true)
-
-    let weekday = int today.DayOfWeek - 1
-
-    if not current || weekday < 0 || weekday > 4 then
-        []
-    else
+    match List.tryItem (int today.DayOfWeek - 1) weekdays with
+    | Some weekday when current ->
         taoItems.Matches(html)
-        |> Seq.map (fun m -> plain m.Groups[1].Value)
+        |> Seq.map (fun m -> Html.plain m.Groups[1].Value)
         |> Seq.filter (fun item ->
             item.Length > 20
-            && (Char.IsDigit item[0] || item.ToLowerInvariant().StartsWith weekdays[weekday]))
+            && (Char.IsDigit item[0] || item.ToLowerInvariant().StartsWith weekday))
         |> Seq.map (fun item ->
             match taoPrice.Matches(item) |> Seq.tryLast with
             | Some price ->
@@ -180,3 +150,4 @@ let tao (today: DateOnly) (html: string) : Item list =
                 }
             | None -> { Text = cleanup item; Price = None })
         |> Seq.toList
+    | _ -> []

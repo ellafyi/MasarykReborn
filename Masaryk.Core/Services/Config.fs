@@ -9,15 +9,14 @@ open Discord
 open Discord.WebSocket
 open Masaryk.Configuration
 open Masaryk.Core
+open Masaryk.Core.Options
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
 /// The admins' log channel, if one is set and the bot can see it.
 let logChannel (context: Context) : ITextChannel option =
     context.Configuration.Current.LogChannel
-    |> Option.bind (fun id ->
-        match context.Client.GetChannel id :> IChannel with
-        | :? ITextChannel as channel -> Some channel
-        | _ -> None)
+    |> Option.bind (fun id -> tryUnbox<ITextChannel>(context.Client.GetChannel id))
 
 let private everyoneCanSee (channel: SocketTextChannel) =
     let everyone = channel.Guild.EveryoneRole
@@ -48,15 +47,16 @@ let private missingChannels (guild: SocketGuild) (configuration: Configuration) 
 
 let private http = new HttpClient()
 
-let private cut (text: string) =
-    if text.Length > 1900 then text[..1897] + "…" else text
+let private refused (problems: string list) =
+    "Nothing was saved. Fix these and import again:\n- "
+    + String.concat "\n- " problems
 
 let private export (context: Context) (interaction: SocketSlashCommand) : Task =
     task {
-        let text =
-            Document.export context.Configuration.Version context.Configuration.Current
-
-        use stream = new MemoryStream(Encoding.UTF8.GetBytes text)
+        use stream =
+            new MemoryStream(
+                Encoding.UTF8.GetBytes(Document.export context.Configuration.Version context.Configuration.Current)
+            )
 
         do!
             interaction.RespondWithFileAsync(
@@ -70,8 +70,7 @@ let private import (context: Context) (repository: ConfigurationRepository) (int
     task {
         do! interaction.DeferAsync(ephemeral = true)
 
-        let attachment =
-            (Seq.head (Seq.head interaction.Data.Options).Options).Value :?> IAttachment
+        let attachment = (snd (input interaction) "file").Value :?> IAttachment
 
         let! reply =
             task {
@@ -82,10 +81,7 @@ let private import (context: Context) (repository: ConfigurationRepository) (int
                     let guild = context.Client.GetGuild context.GuildId
 
                     match Document.read text with
-                    | Error problems ->
-                        return
-                            "Nothing was saved. Fix these and import again:\n- "
-                            + String.concat "\n- " problems
+                    | Error problems -> return refused problems
                     | Ok(None, _) ->
                         return "The file has no `version`. Start from a fresh `/config export` and edit that."
                     | Ok(Some basedOn, configuration) ->
@@ -112,14 +108,10 @@ let private import (context: Context) (repository: ConfigurationRepository) (int
                             | Stale current ->
                                 return
                                     $"Someone saved version {current} after you exported version {basedOn}, so nothing was saved. Export again and redo your changes."
-                        | problems ->
-                            return
-                                "Nothing was saved. Fix these and import again:\n- "
-                                + String.concat "\n- " problems
+                        | problems -> return refused problems
             }
 
-        let! _ = interaction.FollowupAsync(cut reply, ephemeral = true)
-        ()
+        do! interaction.FollowupAsync(MessageEmbed.shorten 2000 reply, ephemeral = true) :> Task
     }
 
 let start: Feature =
@@ -128,7 +120,7 @@ let start: Feature =
             let repository = ConfigurationRepository(context.Database)
 
             let handle (interaction: SocketSlashCommand) : Task =
-                match (Seq.head interaction.Data.Options).Name with
+                match fst (input interaction) with
                 | "export" -> export context interaction
                 | _ -> import context repository interaction
 
@@ -139,21 +131,17 @@ let start: Feature =
                         Description = "This server's bot configuration"
                         Options =
                             [
-                                SlashCommandOptionBuilder()
-                                    .WithName("export")
-                                    .WithDescription("Get the configuration as a file to edit")
-                                    .WithType(ApplicationCommandOptionType.SubCommand)
-                                SlashCommandOptionBuilder()
-                                    .WithName("import")
-                                    .WithDescription("Check and apply an edited configuration file")
-                                    .WithType(ApplicationCommandOptionType.SubCommand)
-                                    .AddOption(
-                                        SlashCommandOptionBuilder()
-                                            .WithName("file")
-                                            .WithDescription("The file from /config export, edited")
-                                            .WithType(ApplicationCommandOptionType.Attachment)
+                                subcommand "export" "Get the configuration as a file to edit" []
+                                subcommand
+                                    "import"
+                                    "Check and apply an edited configuration file"
+                                    [
+                                        (option
+                                            "file"
+                                            "The file from /config export, edited"
+                                            ApplicationCommandOptionType.Attachment)
                                             .WithRequired(true)
-                                    )
+                                    ]
                             ]
                         Permission = Some GuildPermission.Administrator
                         Handle = handle

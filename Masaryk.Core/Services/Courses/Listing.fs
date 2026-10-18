@@ -2,6 +2,7 @@
 module Masaryk.Core.Services.Courses.Listing
 
 open Discord
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
 let pageSize = 20
@@ -23,7 +24,7 @@ let render
     (courses: (Course * uint64 option) list)
     (total: int64)
     : Embed * MessageComponent =
-    let pages = max 1 (int ((total + int64 pageSize - 1L) / int64 pageSize))
+    let pages = Pager.count pageSize total
 
     let line (course: Course, channel: uint64 option) =
         let code =
@@ -32,11 +33,7 @@ let render
             else
                 $"{course.Faculty}:{course.Code}"
 
-        let name =
-            if course.Name.Length > 100 then
-                course.Name[..98] + "…"
-            else
-                course.Name
+        let name = MessageEmbed.shorten 100 course.Name
 
         match channel with
         | Some id -> $"**{code}** {name} · <#{id}>"
@@ -58,10 +55,4 @@ let render
             .WithFooter($"Page {page + 1} of {pages} · {total} courses")
             .Build()
 
-    let buttons =
-        ComponentBuilder()
-            .WithButton("◀", buttonId faculty (page - 1), ButtonStyle.Secondary, disabled = (page = 0))
-            .WithButton("▶", buttonId faculty (page + 1), ButtonStyle.Secondary, disabled = (page + 1 >= pages))
-            .Build()
-
-    embed, buttons
+    embed, Pager.buttons (buttonId faculty) page pages

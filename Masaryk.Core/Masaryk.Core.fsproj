@@ -9,9 +9,13 @@
     <ItemGroup>
         <Compile Include="ConfigurationStore.fs" />
         <Compile Include="Command.fs" />
+        <Compile Include="Options.fs" />
         <Compile Include="Services\Shared\MessageEmbed.fs" />
         <Compile Include="Services\Shared\Worker.fs" />
         <Compile Include="Services\Shared\Replies.fs" />
+        <Compile Include="Services\Shared\Html.fs" />
+        <Compile Include="Services\Shared\Pager.fs" />
+        <Compile Include="Services\Shared\Paging.fs" />
         <Compile Include="Services\Config.fs" />
         <Compile Include="Services\Starboard\Domain.fs" />
         <Compile Include="Services\Starboard\Evaluation.fs" />
@@ -51,8 +55,6 @@
             <Link>.dockerignore</Link>
         </Content>
         <Content Include="Dockerfile" />
-        <EmbeddedResource Include="Assets\night_sky.txt" LogicalName="night_sky.txt" />
-        <EmbeddedResource Include="Assets\hugs.txt" LogicalName="hugs.txt" />
     </ItemGroup>
 
     <ItemGroup>

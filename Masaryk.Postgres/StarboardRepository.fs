@@ -59,8 +59,10 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
     /// Record the old bot's posts as (source message, the new board's channel, old post)
     /// and return how many were new.
     member _.SaveLegacy(posts: (uint64 * uint64 * uint64) list) : Task<int> =
-        let column pick =
-            posts |> List.map (pick >> decimal) |> List.toArray |> box
+        let sources, channels, posts = List.unzip3 posts
+
+        let column (ids: uint64 list) =
+            ids |> List.map decimal |> List.toArray |> box
 
         Sql.affected
             (command
@@ -69,8 +71,4 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
                 SELECT * FROM unnest($1::numeric[], $2::numeric[], $3::numeric[])
                 ON CONFLICT (source_message_id) DO NOTHING
                 """)
-            [
-                column (fun (source, _, _) -> source)
-                column (fun (_, channel, _) -> channel)
-                column (fun (_, _, post) -> post)
-            ]
+            [ column sources; column channels; column posts ]

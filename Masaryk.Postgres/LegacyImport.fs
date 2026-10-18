@@ -116,8 +116,7 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
             use! connection = dataSource.OpenConnectionAsync()
             use! transaction = connection.BeginTransactionAsync()
 
-            let command (sql: string) =
-                new NpgsqlCommand(sql, connection, transaction)
+            let command = Sql.command transaction
 
             let! imported =
                 Sql.scalar (command "SELECT history_imported_at IS NOT NULL FROM leaderboard_state FOR UPDATE") []

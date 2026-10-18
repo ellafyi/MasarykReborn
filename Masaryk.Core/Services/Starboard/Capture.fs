@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
 open Masaryk.Configuration
+open Masaryk.Core
 open Masaryk.Core.Services.Shared
 open Masaryk.Core.Services.Starboard
 open Masaryk.Core.Services.Starboard.DiscordAdapter
@@ -97,20 +98,14 @@ let private update
             | _ -> ()
     }
 
-let handle
-    (client: DiscordSocketClient)
-    (repository: StarboardRepository)
-    (guildId: uint64)
-    (boards: Board list)
-    (reaction: ReactionEvent)
-    : Task<unit> =
+let handle (context: Context) (repository: StarboardRepository) (reaction: ReactionEvent) : Task =
     task {
         match! repository.Find reaction.MessageId with
-        | Some(Posted posted) -> do! update client repository reaction posted
+        | Some(Posted posted) -> do! update context.Client repository reaction posted
         | Some Legacy -> ()
         | None when reaction.Added ->
-            match! evaluate client guildId boards reaction with
-            | Some(board, message, qualifying) -> do! post client repository board message qualifying
+            match! evaluate context.Client context.GuildId context.Configuration.Current.Boards reaction with
+            | Some(board, message, qualifying) -> do! post context.Client repository board message qualifying
             | None -> ()
         | None -> ()
     }

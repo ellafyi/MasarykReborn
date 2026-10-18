@@ -13,13 +13,7 @@ let start: Feature =
             Worker.start
                 (fun (reaction: DiscordAdapter.ReactionEvent) ->
                     $"Starboard processing for {reaction.ChannelId}/{reaction.MessageId}")
-                (fun reaction ->
-                    Capture.handle
-                        context.Client
-                        repository
-                        context.GuildId
-                        context.Configuration.Current.Boards
-                        reaction)
+                (Capture.handle context repository)
             |> DiscordAdapter.subscribe context.Client context.GuildId
 
             return [ SlashCommand.command context repository ]

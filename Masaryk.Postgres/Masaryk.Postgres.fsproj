@@ -28,6 +28,7 @@
         <EmbeddedResource Include="Migrations/009_legacy_starboard_posts.sql" />
         <EmbeddedResource Include="Migrations/010_guild_settings.sql" />
         <EmbeddedResource Include="Migrations/011_configuration.sql" />
+        <EmbeddedResource Include="Migrations/012_course_names.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

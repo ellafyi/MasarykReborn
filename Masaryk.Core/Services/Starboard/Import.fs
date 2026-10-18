@@ -3,10 +3,10 @@
 module Masaryk.Core.Services.Starboard.Import
 
 open System
-open System.Collections.Generic
 open System.Text.RegularExpressions
 open System.Threading.Tasks
 open Discord
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
 /// The old bot ended every post's description with `[Jump to original!](<link>) in <#channel>`.
@@ -23,10 +23,6 @@ let original (guildId: uint64) (description: string) : uint64 option =
 
 type Result = { Read: int; Found: int; Added: int }
 
-/// Discord.Net gives up on requests that wait more than 15 s for a rate limit.
-let private patient () =
-    RequestOptions(Timeout = Nullable 300_000)
-
 /// Read the whole channel, newest first, and record every old post's original as posted on
 /// the board in `boardChannel`. `progress` hears the running totals after every page.
 let read
@@ -36,43 +32,29 @@ let read
     (boardChannel: uint64)
     (progress: Result -> Task)
     : Task<Result> =
-    task {
-        let mutable before: uint64 option = None
-        let mutable reading = true
-        let mutable result = { Read = 0; Found = 0; Added = 0 }
+    channel.GetMessagesAsync(Int32.MaxValue, options = Paging.patient ())
+    |> Paging.fold
+        (fun result page ->
+            task {
+                let posts =
+                    page
+                    |> Seq.filter _.Author.IsBot
+                    |> Seq.choose (fun post ->
+                        post.Embeds
+                        |> Seq.tryPick (fun embed -> Option.ofObj embed.Description |> Option.bind (original guildId))
+                        |> Option.map (fun source -> source, boardChannel, post.Id))
+                    |> Seq.toList
 
-        while reading do
-            let pages =
-                match before with
-                | Some id -> channel.GetMessagesAsync(id, Direction.Before, 100, options = patient ())
-                | None -> channel.GetMessagesAsync(100, options = patient ())
+                let! added = repository.SaveLegacy posts
 
-            let! page = unbox<IAsyncEnumerable<seq<IMessage>>>(box pages) |> _.FlattenAsync()
-            let page = List.ofSeq page
+                let result =
+                    {
+                        Read = result.Read + page.Count
+                        Found = result.Found + posts.Length
+                        Added = result.Added + added
+                    }
 
-            let posts =
-                page
-                |> List.filter _.Author.IsBot
-                |> List.choose (fun post ->
-                    post.Embeds
-                    |> Seq.tryPick (fun embed ->
-                        original guildId (Option.ofObj embed.Description |> Option.defaultValue ""))
-                    |> Option.map (fun source -> source, boardChannel, post.Id))
-
-            let! added = repository.SaveLegacy posts
-
-            result <-
-                {
-                    Read = result.Read + page.Length
-                    Found = result.Found + posts.Length
-                    Added = result.Added + added
-                }
-
-            do! progress result
-            reading <- page.Length = 100
-
-            if reading then
-                before <- Some(page |> List.map _.Id |> List.min)
-
-        return result
-    }
+                do! progress result
+                return result, true
+            })
+        { Read = 0; Found = 0; Added = 0 }

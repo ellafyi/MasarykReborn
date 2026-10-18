@@ -3,18 +3,14 @@ module Masaryk.Core.Services.Leaderboard.Import
 
 open System
 open System.Collections.Concurrent
-open System.Collections.Generic
 open System.Threading.Tasks
 open Discord
 open Discord.Net
 open Discord.Rest
 open Npgsql
+open Masaryk.Core.Services.Shared
+open Masaryk.Core.Services.Shared.Paging
 open Masaryk.Postgres
-
-/// Discord.Net gives up on requests that wait more than 15 s for a rate limit; Discord makes them wait ~30 s.
-/// (No timeout at all crashes Discord.Net's rate limiter.)
-let private patient () =
-    RequestOptions(Timeout = Nullable 300_000)
 
 /// Run work on up to 8 items at once.
 let private inParallel (items: 'T list) (work: 'T -> Task<'R option>) : Task<'R list> =
@@ -97,33 +93,21 @@ let private fillGap
     (start: uint64)
     (cutoff: uint64)
     : Task<int> =
-    task {
-        let mutable from = start
-        let mutable reading = true
-        let mutable saved = 0
+    channel.GetMessagesAsync(start, Direction.After, Int32.MaxValue, options = patient ())
+    |> Paging.fold
+        (fun saved page ->
+            task {
+                let counted =
+                    page
+                    |> Seq.filter (fun message -> message.Id < cutoff && Counting.counts guildId message)
+                    |> Seq.map (fun message ->
+                        message.Id, countedChannel, message.Author.Id, message.Timestamp.UtcDateTime)
+                    |> Seq.toList
 
-        while reading do
-            let pages =
-                channel.GetMessagesAsync(from, Direction.After, 100, options = patient ())
-
-            let! page = unbox<IAsyncEnumerable<seq<IMessage>>>(box pages) |> _.FlattenAsync()
-            let page = List.ofSeq page
-
-            let counted =
-                page
-                |> List.filter (fun message -> message.Id < cutoff && Counting.counts guildId message)
-                |> List.map (fun message ->
-                    message.Id, countedChannel, message.Author.Id, message.Timestamp.UtcDateTime)
-
-            do! import.SaveGap counted
-            saved <- saved + counted.Length
-            reading <- page.Length = 100 && page |> List.forall (fun message -> message.Id < cutoff)
-
-            if reading then
-                from <- page |> List.map _.Id |> List.max
-
-        return saved
-    }
+                do! import.SaveGap counted
+                return saved + counted.Length, page |> Seq.forall (fun message -> message.Id < cutoff)
+            })
+        0
 
 let private gap (client: DiscordRestClient) (import: LegacyImport) (guildId: uint64) (countingSince: DateTime) =
     task {

@@ -58,51 +58,39 @@ let command (context: Context) (repository: StarboardRepository) : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
             do! interaction.DeferAsync(ephemeral = true)
-            let subcommand = Seq.head interaction.Data.Options
-
-            let channel name =
-                subcommand.Options |> Seq.find (fun o -> o.Name = name) |> _.Value :?> IChannel
-
-            let from = channel "from"
-            let target = channel "to"
+            let _, value = Options.input interaction
+            let from = (value "from").Value :?> IMessageChannel
+            let target = (value "to").Value :?> IChannel
             let boards = context.Configuration.Current.Boards |> List.filter _.IsActive
 
-            match boards |> List.tryFind (fun board -> board.Target = target.Id), from with
-            | Some board, (:? IMessageChannel as from) -> do! import context repository interaction from board
-            | _ ->
+            match boards |> List.tryFind (fun board -> board.Target = target.Id) with
+            | Some board -> do! import context repository interaction from board
+            | None ->
                 let targets =
                     boards
                     |> List.map (fun board -> $"{board.Name} (<#{board.Target}>)")
                     |> String.concat ", "
 
-                let! _ =
+                do!
                     interaction.FollowupAsync(
                         $"<#{target.Id}> isn't a starboard channel. Boards in `/config`: {targets}.",
                         ephemeral = true
                     )
-
-                ()
+                    :> Task
         }
-
-    let channel (name: string) (description: string) =
-        SlashCommandOptionBuilder()
-            .WithName(name)
-            .WithDescription(description)
-            .WithType(ApplicationCommandOptionType.Channel)
-            .AddChannelType(ChannelType.Text)
-            .WithRequired(true)
 
     {
         Name = "starboard"
         Description = "Manage this server's starboards"
         Options =
             [
-                SlashCommandOptionBuilder()
-                    .WithName("import")
-                    .WithDescription("Read the old bot's posts so their originals aren't posted again")
-                    .WithType(ApplicationCommandOptionType.SubCommand)
-                    .AddOption(channel "from" "A channel the old bot posted starboard messages in")
-                    .AddOption(channel "to" "The board's channel in this bot's configuration")
+                Options.subcommand
+                    "import"
+                    "Read the old bot's posts so their originals aren't posted again"
+                    [
+                        Options.textChannel "from" "A channel the old bot posted starboard messages in"
+                        Options.textChannel "to" "The board's channel in this bot's configuration"
+                    ]
             ]
         Permission = Some GuildPermission.Administrator
         Handle = handle
