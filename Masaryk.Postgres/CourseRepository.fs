@@ -224,6 +224,32 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
     member _.All() : Task<Course list> =
         Sql.query (dataSource.CreateCommand $"{named} ORDER BY c.id, r.catalog_import_id DESC") [] course
 
+    /// One page of courses ordered by faculty and code, with linked channels and the total count.
+    member _.Page(faculty: string option, offset: int, limit: int) : Task<(Course * uint64 option) list * int64> =
+        task {
+            let! rows =
+                Sql.query
+                    (dataSource.CreateCommand
+                        $"""
+                        SELECT f.*, l.channel_id, count(*) OVER () FROM (
+                            {named}
+                            WHERE $1::text IS NULL OR lower(c.faculty_code) = lower($1)
+                            ORDER BY c.id, r.catalog_import_id DESC
+                        ) f
+                        LEFT JOIN course_channel l ON l.course_id = f.id
+                        ORDER BY f.faculty_code, f.code
+                        LIMIT $2 OFFSET $3
+                        """)
+                    [ Sql.optional faculty; box limit; box offset ]
+                    (fun r -> (course r, Sql.readOptional r 4 (r.GetDecimal >> uint64)), r.GetInt64 5)
+
+            let total = rows |> List.tryHead |> Option.map snd |> Option.defaultValue 0L
+            return List.map fst rows, total
+        }
+
+    member _.Faculties() : Task<string list> =
+        Sql.query (dataSource.CreateCommand "SELECT code FROM faculty ORDER BY code") [] _.GetString(0)
+
     /// Course ID and channel ID of every linked course.
     member _.Links() : Task<(int64 * uint64) list> =
         Sql.query (dataSource.CreateCommand "SELECT course_id, channel_id FROM course_channel") [] (fun r ->

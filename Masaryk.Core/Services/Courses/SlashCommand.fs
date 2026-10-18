@@ -24,15 +24,48 @@ let private cut (length: int) (text: string) =
 let autocomplete (repository: CourseRepository) (interaction: SocketAutocompleteInteraction) : Task =
     task {
         if interaction.Data.CommandName = name then
-            let! courses =
-                repository.Search(string interaction.Data.Current.Value, Channels.home)
+            let typed = string interaction.Data.Current.Value
 
-            let results =
-                courses
-                |> List.map (fun c ->
-                    AutocompleteResult(cut 100 $"{c.Faculty}:{c.Code} {c.Name}", $"{c.Faculty}:{c.Code}"))
+            if interaction.Data.Current.Name = "faculty" then
+                let! faculties = repository.Faculties()
 
-            do! interaction.RespondAsync(results)
+                let results =
+                    faculties
+                    |> List.filter _.StartsWith(typed, StringComparison.OrdinalIgnoreCase)
+                    |> List.map (fun f -> AutocompleteResult(f, f))
+
+                do! interaction.RespondAsync(results)
+            else
+                let! courses = repository.Search(typed, Channels.home)
+
+                let results =
+                    courses
+                    |> List.map (fun c ->
+                        AutocompleteResult(cut 100 $"{c.Faculty}:{c.Code} {c.Name}", $"{c.Faculty}:{c.Code}"))
+
+                do! interaction.RespondAsync(results)
+    }
+
+let private page (repository: CourseRepository) (faculty: string option) (number: int) =
+    task {
+        let! courses, total =
+            repository.Page(faculty, number * Listing.pageSize, Listing.pageSize)
+
+        return Listing.render faculty number courses total
+    }
+
+/// Turn a `/courses list` page.
+let turnPage (repository: CourseRepository) (interaction: SocketMessageComponent) : Task =
+    task {
+        match Listing.parseButton interaction.Data.CustomId with
+        | Some(faculty, number) ->
+            let! embed, buttons = page repository faculty number
+
+            do!
+                interaction.UpdateAsync(fun message ->
+                    message.Embed <- embed
+                    message.Components <- buttons)
+        | None -> ()
     }
 
 let private report (matching: Channels.Matching) =
@@ -68,6 +101,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
 
             let withCourse (act: Course -> Task) =
                 task {
+                    do! interaction.DeferAsync()
                     let value = option "course" |> Option.map string |> Option.defaultValue ""
 
                     match! find repository value with
@@ -75,10 +109,13 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
                     | None -> do! interaction.FollowupAsync($"There's no course {value} in the catalog.") :> Task
                 }
 
-            do! interaction.DeferAsync()
-
             match subcommand.Name with
+            | "list" ->
+                let faculty = option "faculty" |> Option.map string
+                let! embed, buttons = page repository faculty 0
+                do! interaction.RespondAsync(embed = embed, components = buttons, ephemeral = true)
             | "match" ->
+                do! interaction.DeferAsync()
                 let! matching = Guild.matchChannels repository (guild ())
                 let! _ = interaction.FollowupAsync(report matching)
                 ()
@@ -143,6 +180,16 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) : Command =
         Description = "Course channels"
         Options =
             [
+                subcommand
+                    "list"
+                    "Courses in the catalog"
+                    [
+                        SlashCommandOptionBuilder()
+                            .WithName("faculty")
+                            .WithDescription("Only this faculty's courses, such as FI")
+                            .WithType(ApplicationCommandOptionType.String)
+                            .WithAutocomplete(true)
+                    ]
                 subcommand "match" "Link channels named after courses in the catalog" []
                 subcommand
                     "link"

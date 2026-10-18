@@ -16,6 +16,8 @@ let start: Feature =
                 Func<SocketAutocompleteInteraction, Task>(SlashCommand.autocomplete repository)
             )
 
+            context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(SlashCommand.turnPage repository))
+
             let guild () =
                 context.Client.GetGuild context.GuildId :> IGuild
 

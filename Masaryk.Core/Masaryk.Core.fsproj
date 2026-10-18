@@ -31,6 +31,7 @@
         <Compile Include="Services\Courses\Import.fs" />
         <Compile Include="Services\Courses\Channels.fs" />
         <Compile Include="Services\Courses\Guild.fs" />
+        <Compile Include="Services\Courses\Listing.fs" />
         <Compile Include="Services\Courses\SlashCommand.fs" />
         <Compile Include="Services\Courses\Feature.fs" />
         <Compile Include="Commands\Cummy.fs" />
