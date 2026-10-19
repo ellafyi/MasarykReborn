@@ -11,13 +11,9 @@ COPY ["Masaryk.Configuration/Masaryk.Configuration.fsproj", "Masaryk.Configurati
 RUN dotnet restore "Masaryk.Core/Masaryk.Core.fsproj"
 COPY . .
 WORKDIR "/src/Masaryk.Core"
-RUN dotnet build "./Masaryk.Core.fsproj" -c $BUILD_CONFIGURATION -o /app/build
-
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Masaryk.Core.fsproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Masaryk.Core.dll"]
