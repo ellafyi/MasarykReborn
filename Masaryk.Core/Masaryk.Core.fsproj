@@ -44,8 +44,6 @@
         <Compile Include="Services\Menu\Fetching.fs" />
         <Compile Include="Services\Menu\Rendering.fs" />
         <Compile Include="Services\Menu\Feature.fs" />
-        <Compile Include="Commands\Cummy.fs" />
-        <Compile Include="Commands\Test.fs" />
         <Compile Include="CommandRegistry.fs" />
     </ItemGroup>
 

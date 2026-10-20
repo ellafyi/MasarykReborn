@@ -2,9 +2,6 @@ module Masaryk.Core.CommandRegistry
 
 open Masaryk.Core
 
-/// Commands that don't belong to a feature.
-let builtIn: Command list = [ Commands.Cummy.command; Commands.Test.command ]
-
 let byName (commands: Command list) : Map<string, Command> =
     commands
     |> List.countBy (fun command -> command.Name)

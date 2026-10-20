@@ -112,7 +112,7 @@ let run (database: NpgsqlDataSource) : Task<unit> =
                 Configuration = configuration
             }
 
-        let mutable commands = CommandRegistry.builtIn
+        let mutable commands: Command list = []
 
         for start in features do
             let! featureCommands = start context
