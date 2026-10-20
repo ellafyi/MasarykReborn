@@ -9,6 +9,9 @@ Upgrade to .NET 11 is planned, once a full release happens and dependencies get 
 This project is being made with JetBrains Rider. Visual Studio can work, but if any issues arise, you're on your own.
 All parts of the bot are launched via a Docker Compose stack. Compose provides a testing Postgres database, the bot itself, as well as all of its parts, including the migration service.
 
+## Deployment
+Production runs as a Portainer stack next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables.
+
 ## Planned Features
 
 The plan is to eventually do everything the [old bot](https://github.com/zloutek1/MasarykBOT/tree/main/bot/cogs) did.

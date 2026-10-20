@@ -1,0 +1,66 @@
+# Production stack for Portainer: Stacks > Add stack > Repository, compose path `compose.portainer.yaml`.
+# Variables are set in the Portainer UI (there is no .env file). See docs/deployment.md.
+#
+# Deploy the inference stack (MasarykTraining) first: it creates the `masaryk` network
+# that the bot joins to reach the language model at http://masaryk:8000/v1.
+services:
+  masaryk.core:
+    image: masaryk.core
+    build:
+      context: .
+      dockerfile: Masaryk.Core/Dockerfile
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: "${BOT_TOKEN:?Set BOT_TOKEN to the Discord bot token}"
+      GUILD_ID: "${GUILD_ID:?Set GUILD_ID to the Discord server ID}"
+      LLM_API_URL: "${LLM_API_URL-http://masaryk:8000/v1}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-masaryk}"
+      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
+    depends_on:
+      masaryk.migrator:
+        condition: service_completed_successfully
+    networks:
+      - postgres-network
+      - llm
+
+  masaryk.migrator:
+    image: masaryk.migrator
+    build:
+      context: .
+      dockerfile: Masaryk.Postgres.Migrator/Dockerfile
+    restart: "no"
+    environment:
+      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
+    depends_on:
+      masaryk.db:
+        condition: service_healthy
+    networks:
+      - postgres-network
+
+  masaryk.db:
+    image: postgres:18-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-masaryk}"
+      POSTGRES_DB: "${POSTGRES_DB:-masaryk}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    networks:
+      - postgres-network
+    volumes:
+      - masaryk-db:/var/lib/postgresql
+
+volumes:
+  masaryk-db:
+
+networks:
+  postgres-network:
+    driver: bridge
+  llm:
+    external: true
+    name: "${MASARYK_NETWORK:-masaryk}"
