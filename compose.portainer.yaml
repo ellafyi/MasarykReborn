@@ -1,5 +1,5 @@
 # Production stack for Portainer: Stacks > Add stack > Repository, compose path `compose.portainer.yaml`.
-# Variables are set in the Portainer UI (there is no .env file). See docs/deployment.md.
+# Variables are set in the Portainer UI (there is no .env file).
 #
 # Deploy the inference stack (MasarykTraining) first: it creates the `masaryk` network
 # that the bot joins to reach the language model at http://masaryk:8000/v1.
