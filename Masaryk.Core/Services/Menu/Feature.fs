@@ -7,10 +7,13 @@ open Masaryk.Core
 
 let private show (context: Context) (interaction: SocketSlashCommand) : Task =
     task {
-        do! interaction.DeferAsync()
+        do! interaction.DeferAsync(ephemeral = true)
         let! menus = Fetching.get context.Configuration.Current.Restaurants
         let content, embeds, buttons = Rendering.render menus 0
-        let! _ = interaction.FollowupAsync(content, embeds = embeds, components = buttons)
+
+        let! _ =
+            interaction.FollowupAsync(content, embeds = embeds, components = buttons, ephemeral = true)
+
         ()
     }
 

@@ -6,9 +6,8 @@ open Discord
 open Masaryk.Core.Services.Menu.Fetching
 open Masaryk.Core.Services.Shared
 
-/// Discord allows 6,000 characters across a message's embeds; five short menus fit.
-let pageSize = 5
-let private limit = 1000
+let pageSize = 1
+let private limit = 4000
 
 let buttonId (page: int) = $"menu:{page}"
 
@@ -63,6 +62,10 @@ let render (menus: Menus) (page: int) : string * Embed array * MessageComponent 
                 .Build())
         |> List.toArray
 
-    $"**Lunch near FI, {menus.Day.Day}. {menus.Day.Month}. {menus.Day.Year}** · page {page + 1} of {count}",
-    embeds,
-    Pager.buttons buttonId page count
+    let header =
+        if menus.Menus.IsEmpty then
+            "No restaurants are set up."
+        else
+            $"**Lunch near FI, {menus.Day.Day}. {menus.Day.Month}. {menus.Day.Year}** · restaurant {page + 1} of {count}"
+
+    header, embeds, Pager.buttons buttonId page count
