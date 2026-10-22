@@ -28,6 +28,7 @@ let private everyoneCanSee (channel: SocketTextChannel) =
 
     everyone.Permissions.ViewChannel && not denied
 
+/// Settings that point at missing or unusable channels and roles.
 let private missingChannels (guild: SocketGuild) (configuration: Configuration) =
     let exists id = not (isNull (guild.GetChannel id))
 
@@ -42,6 +43,19 @@ let private missingChannels (guild: SocketGuild) (configuration: Configuration) 
             for id in board.Channels do
                 if not (exists id) then
                     $"starboard '{board.Name}' channels: there's no channel {id} on this server"
+
+        match configuration.Lockout with
+        | Some lockout ->
+            match guild.GetRole lockout.RoleId with
+            | null -> $"lockout role: there's no role {lockout.RoleId} on this server"
+            | role when role.IsEveryone || role.IsManaged ->
+                "lockout role: @everyone and bot or booster roles can't be given out"
+            | role when role.Permissions.Administrator -> "lockout role: it must not have the Administrator permission"
+            | _ -> ()
+
+            if isNull (guild.GetTextChannel lockout.ChannelId) then
+                $"lockout channel: there's no text channel {lockout.ChannelId} on this server"
+        | None -> ()
     ]
 
 let private http = new HttpClient()

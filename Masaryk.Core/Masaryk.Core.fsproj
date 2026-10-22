@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -46,6 +46,18 @@
         <Compile Include="Services\Menu\Fetching.fs" />
         <Compile Include="Services\Menu\Rendering.fs" />
         <Compile Include="Services\Menu\Feature.fs" />
+        <Compile Include="Services\Lockout\Hiding.fs" />
+        <Compile Include="Services\Lockout\Members.fs" />
+        <Compile Include="Services\Lockout\Access.fs" />
+        <Compile Include="Services\Lockout\Check.fs" />
+        <Compile Include="Services\Lockout\Notice.fs" />
+        <Compile Include="Services\Lockout\Upkeep.fs" />
+        <Compile Include="Services\Lockout\SlashCommand.fs" />
+        <Compile Include="Services\Lockout\Feature.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Assets\grass.jpg" LogicalName="grass.jpg" />
     </ItemGroup>
 
     <ItemGroup>

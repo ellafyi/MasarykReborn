@@ -106,6 +106,7 @@ From the old bot:
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels
 - [x] Fun commands: emoji, avatars, server icon/banner, http.cat
+- [x] `/touch-grass`: lock yourself out of the server for 1 hour to 1 week (e.g. to study). Your roles are taken away and only a read-only timeout channel stays visible; roles come back on their own. `/touch-grass-check` (admins) verifies the setup.
 - [ ] Running code snippets (C, C++, Python, Haskell, APL)
 - [ ] Help, ping, uptime, server info
 - [ ] Admin commands (say, purge, sync, shutdown, logs)

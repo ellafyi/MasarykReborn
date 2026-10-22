@@ -36,6 +36,9 @@ type Restaurant =
         Source: MenuSource
     }
 
+/// What /touch-grass uses: a locked-out member keeps only `RoleId` and sees only `ChannelId`.
+type LockoutSettings = { RoleId: uint64; ChannelId: uint64 }
+
 /// Everything a server's admins can change about the bot.
 type Configuration =
     {
@@ -45,4 +48,6 @@ type Configuration =
         /// Courses of this faculty get channel names without a faculty prefix.
         HomeFaculty: string option
         Restaurants: Restaurant list
+        /// Unset turns /touch-grass off.
+        Lockout: LockoutSettings option
     }

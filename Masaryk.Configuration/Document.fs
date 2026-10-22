@@ -195,7 +195,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
 
         let result =
             record
-                [ "version"; "logChannel"; "starboard"; "courses"; "menu" ]
+                [ "version"; "logChannel"; "starboard"; "courses"; "lockout"; "menu" ]
                 (fun o ->
                     let version =
                         match (snd o).TryGetProperty "version" with
@@ -203,6 +203,20 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                             Some(value.GetInt64())
                         | true, _ -> fail "version" "must be a whole number"
                         | _ -> None
+
+                    let lockout =
+                        match (snd o).TryGetProperty "lockout" with
+                        | true, value ->
+                            record
+                                [ "role"; "channel" ]
+                                (fun s ->
+                                    match optional s "role" None discordId, optional s "channel" None discordId with
+                                    | Some role, Some channel -> Some { RoleId = role; ChannelId = channel }
+                                    | None, None -> None
+                                    | _ -> fail "lockout" "role and channel must be set together")
+                                "lockout"
+                                value
+                        | _ -> Defaults.configuration.Lockout
 
                     version,
                     {
@@ -214,6 +228,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                         Restaurants =
                             section o "menu" "restaurants" (Some Defaults.configuration.Restaurants) (list restaurant)
                             |> Option.defaultValue []
+                        Lockout = lockout
                     })
                 ""
                 document.RootElement
@@ -286,6 +301,14 @@ let export (version: int64) (configuration: Configuration) : string =
 
     let boards = configuration.Boards |> List.map boardJson |> String.concat ","
 
+    let lockoutId (pick: LockoutSettings -> uint64) placeholder =
+        configuration.Lockout
+        |> Option.map (fun lockout -> $"\"{pick lockout}\"")
+        |> Option.defaultValue placeholder
+
+    let lockoutRole = lockoutId _.RoleId "\"<role ID>\""
+    let lockoutChannel = lockoutId _.ChannelId "\"<channel ID>\""
+
     let restaurants =
         configuration.Restaurants |> List.map restaurantJson |> String.concat ","
 
@@ -314,6 +337,15 @@ let export (version: int64) (configuration: Configuration) : string =
   "courses": {
     // Courses of this faculty get channel names without a faculty prefix.
     "homeFaculty": {{homeFaculty}}
+  },
+
+  "lockout": {
+    // /touch-grass: whoever uses it loses all their roles and gets `role`, which should have no
+    // permissions. The bot hides every channel from `role` except `channel`, which is read-only.
+    // Roles come back when the time is up. The bot's own role must sit above the roles it removes.
+    // Leave both unset to turn /touch-grass off.
+    "role": {{lockoutRole}},
+    "channel": {{lockoutChannel}}
   },
 
   "menu": {

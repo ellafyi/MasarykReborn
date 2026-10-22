@@ -46,4 +46,5 @@ let configuration: Configuration =
         Boards = []
         HomeFaculty = Some "FI"
         Restaurants = restaurants
+        Lockout = None
     }

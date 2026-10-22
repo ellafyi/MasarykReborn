@@ -85,6 +85,7 @@ let features: Feature list =
         Fun.Feature.start
         Courses.Feature.start
         Menu.Feature.start
+        Lockout.Feature.start
         Config.start
     ]
 
