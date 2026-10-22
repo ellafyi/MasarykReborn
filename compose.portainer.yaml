@@ -9,6 +9,7 @@ services:
     build:
       context: .
       dockerfile: Masaryk.Core/Dockerfile
+    pull_policy: build
     restart: unless-stopped
     environment:
       BOT_TOKEN: "${BOT_TOKEN:?Set BOT_TOKEN to the Discord bot token}"
@@ -29,6 +30,7 @@ services:
     build:
       context: .
       dockerfile: Masaryk.Postgres.Migrator/Dockerfile
+    pull_policy: build
     restart: "no"
     environment:
       MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
