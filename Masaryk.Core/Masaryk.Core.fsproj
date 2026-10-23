@@ -3,7 +3,6 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,10 +11,13 @@
         <Compile Include="Options.fs" />
         <Compile Include="Services\Shared\MessageEmbed.fs" />
         <Compile Include="Services\Shared\Worker.fs" />
+        <Compile Include="Services\Shared\Messages.fs" />
         <Compile Include="Services\Shared\Replies.fs" />
         <Compile Include="Services\Shared\Html.fs" />
         <Compile Include="Services\Shared\Pager.fs" />
         <Compile Include="Services\Shared\Paging.fs" />
+        <Compile Include="Services\Shared\Period.fs" />
+        <Compile Include="Services\Shared\Cooldown.fs" />
         <Compile Include="Services\Config.fs" />
         <Compile Include="Services\Starboard\Domain.fs" />
         <Compile Include="Services\Starboard\Evaluation.fs" />
@@ -44,15 +46,10 @@
         <Compile Include="Services\Menu\Fetching.fs" />
         <Compile Include="Services\Menu\Rendering.fs" />
         <Compile Include="Services\Menu\Feature.fs" />
-        <Compile Include="CommandRegistry.fs" />
     </ItemGroup>
 
     <ItemGroup>
         <Compile Include="Program.fs" />
-        <Content Include="..\.dockerignore">
-            <Link>.dockerignore</Link>
-        </Content>
-        <Content Include="Dockerfile" />
     </ItemGroup>
 
     <ItemGroup>

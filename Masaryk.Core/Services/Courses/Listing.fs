@@ -7,16 +7,7 @@ open Masaryk.Postgres
 
 let pageSize = 20
 
-let private prefix = "courses-list"
-
-/// Button IDs carry the filter and page, so turning pages needs no stored state.
-let buttonId (faculty: string option) (page: int) =
-    $"""{prefix}:{Option.defaultValue "" faculty}:{page}"""
-
-let parseButton (id: string) : (string option * int) option =
-    match id.Split(':') with
-    | [| p; faculty; page |] when p = prefix -> Some((if faculty = "" then None else Some faculty), int page)
-    | _ -> None
+let prefix = "courses-list"
 
 let render
     (faculty: string option)
@@ -55,4 +46,4 @@ let render
             .WithFooter($"Page {page + 1} of {pages} · {total} courses")
             .Build()
 
-    embed, Pager.buttons (buttonId faculty) page pages
+    embed, Pager.buttons prefix (Option.defaultValue "" faculty) page pages

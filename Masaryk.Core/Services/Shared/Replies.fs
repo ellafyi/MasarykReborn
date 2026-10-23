@@ -2,15 +2,6 @@ module Masaryk.Core.Services.Shared.Replies
 
 open System.Threading.Tasks
 open Discord
-open Discord.Rest
-open Discord.WebSocket
-
-/// Threads and forum posts belong to their parent channel.
-let parentOrSelf (channel: IChannel) : uint64 =
-    match channel with
-    | :? SocketThreadChannel as thread -> thread.ParentChannel.Id
-    | :? RestThreadChannel as thread -> thread.ParentChannelId
-    | _ -> channel.Id
 
 let parentId (message: IMessage) : uint64 option =
     if message.Type = MessageType.Reply then

@@ -62,16 +62,16 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
             course
 
     /// Up to 25 courses whose code starts with text or whose name contains it, home faculty first.
-    member _.Search(text: string, home: string) : Task<Course list> =
+    member _.Search(text: string, home: string option) : Task<Course list> =
         Sql.query
             (dataSource.CreateCommand
                 """
                 SELECT id, faculty_code, code, name FROM course
                 WHERE code ILIKE $1 || '%' OR name ILIKE '%' || $1 || '%'
-                ORDER BY faculty_code <> $2, code NOT ILIKE $1 || '%', code
+                ORDER BY faculty_code IS DISTINCT FROM $2::text, code NOT ILIKE $1 || '%', code
                 LIMIT 25
                 """)
-            [ box text; box home ]
+            [ box text; Sql.optional home ]
             course
 
     member _.All() : Task<Course list> =

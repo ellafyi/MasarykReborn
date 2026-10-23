@@ -78,10 +78,9 @@ let category (home: string option) (course: Course) : string =
 /// Discord's limit on channels in a category.
 let categorySize = 50
 
-/// The first of `name`, `name 2`, `name 3`… with room for another channel.
-let roomIn (name: string) (sizes: Map<string, int>) : string =
+/// `name`, `name 2`, `name 3`…: the names a course category overflows into.
+let numbered (name: string) : string seq =
     Seq.initInfinite (fun i -> if i = 0 then name else $"{name} {i + 1}")
-    |> Seq.find (fun candidate -> Map.tryFind candidate sizes |> Option.defaultValue 0 < categorySize)
 
 /// Whether `category` is `name` or one of its numbered overflow categories.
 let isOneOf (name: string) (category: string) : bool =

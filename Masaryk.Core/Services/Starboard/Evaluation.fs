@@ -33,11 +33,10 @@ let qualifyingReaction
     : QualifyingReaction option =
     let qualifying =
         reactions
-        |> Seq.groupBy _.Emoji.Key
-        |> Seq.map (fun (_, observations) ->
+        |> Seq.map (fun observation ->
             {
-                Emoji = (Seq.head observations).Emoji
-                EligibleCount = observations |> Seq.collect _.Reactors |> eligibleCount authorId
+                Emoji = observation.Emoji
+                EligibleCount = eligibleCount authorId observation.Reactors
             })
         |> Seq.filter (fun reaction -> reaction.EligibleCount >= threshold)
         |> Seq.sortBy _.Emoji.Key

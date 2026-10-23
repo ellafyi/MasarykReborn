@@ -6,14 +6,9 @@ open Npgsql
 
 /// One-off import of the old bot's message history, restored into the legacy schema.
 type LegacyImport(dataSource: NpgsqlDataSource) =
-    let command (sql: string) = dataSource.CreateCommand sql
-
-    let ids (values: uint64 seq) =
-        values |> Seq.map decimal |> Seq.toArray |> box
-
     member _.Prepare() : Task<unit> =
         Sql.execute
-            (command
+            (dataSource.CreateCommand
                 """
                 CREATE TABLE IF NOT EXISTS legacy.bots (author_id numeric PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS legacy.checked (author_id numeric PRIMARY KEY);
@@ -35,7 +30,7 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
     member _.Imported() : Task<bool> =
         task {
             let! imported =
-                Sql.scalar (command "SELECT history_imported_at IS NOT NULL FROM leaderboard_state") []
+                Sql.scalar (dataSource.CreateCommand "SELECT history_imported_at IS NOT NULL FROM leaderboard_state") []
 
             return unbox<bool> imported
         }
@@ -43,7 +38,7 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
     /// Authors with enough messages to matter in the rankings, not yet checked.
     member _.BusyAuthors(minimum: int) : Task<uint64 list> =
         Sql.query
-            (command
+            (dataSource.CreateCommand
                 """
                 SELECT author_id::numeric FROM legacy.backed_up_messages
                 WHERE type IN (0, 19)
@@ -55,15 +50,17 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
             (fun r -> uint64 (r.GetDecimal 0))
 
     member _.Channels() : Task<uint64 list> =
-        Sql.query (command "SELECT DISTINCT channel_id::numeric FROM legacy.backed_up_messages") [] (fun r ->
-            uint64 (r.GetDecimal 0))
+        Sql.query
+            (dataSource.CreateCommand "SELECT DISTINCT channel_id::numeric FROM legacy.backed_up_messages")
+            []
+            (fun r -> uint64 (r.GetDecimal 0))
 
     /// The newest old message per channel, where the gap fill continues from.
     member _.LastMessages() : Task<Map<uint64, uint64>> =
         task {
             let! rows =
                 Sql.query
-                    (command
+                    (dataSource.CreateCommand
                         "SELECT channel_id::numeric, max(message_id::numeric) FROM legacy.backed_up_messages GROUP BY 1")
                     []
                     (fun r -> uint64 (r.GetDecimal 0), uint64 (r.GetDecimal 1))
@@ -75,14 +72,16 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
     member _.DumpEnd() : Task<DateTime> =
         task {
             let! last =
-                Sql.scalar (command "SELECT max(posted_at) AT TIME ZONE 'UTC' FROM legacy.backed_up_messages") []
+                Sql.scalar
+                    (dataSource.CreateCommand "SELECT max(posted_at) AT TIME ZONE 'UTC' FROM legacy.backed_up_messages")
+                    []
 
             return unbox<DateTime> last
         }
 
     member _.SaveAuthor(authorId: uint64, isBot: bool) : Task<unit> =
         Sql.execute
-            (command
+            (dataSource.CreateCommand
                 """
                 INSERT INTO legacy.checked VALUES ($1);
                 INSERT INTO legacy.bots SELECT $1 WHERE $2 ON CONFLICT DO NOTHING;
@@ -91,22 +90,22 @@ type LegacyImport(dataSource: NpgsqlDataSource) =
 
     member _.SaveParents(threads: (uint64 * uint64) list) : Task<unit> =
         Sql.execute
-            (command
+            (dataSource.CreateCommand
                 "INSERT INTO legacy.parents SELECT * FROM unnest($1::numeric[], $2::numeric[]) ON CONFLICT DO NOTHING")
-            [ ids (List.map fst threads); ids (List.map snd threads) ]
+            [ Sql.ids (List.map fst threads); Sql.ids (List.map snd threads) ]
 
     member _.SaveGap(messages: (uint64 * uint64 * uint64 * DateTime) list) : Task<unit> =
         Sql.execute
-            (command
+            (dataSource.CreateCommand
                 """
                 INSERT INTO legacy.gap_messages
                 SELECT * FROM unnest($1::numeric[], $2::numeric[], $3::numeric[], $4::timestamptz[])
                 ON CONFLICT DO NOTHING
                 """)
             [
-                ids (messages |> List.map (fun (id, _, _, _) -> id))
-                ids (messages |> List.map (fun (_, channel, _, _) -> channel))
-                ids (messages |> List.map (fun (_, _, author, _) -> author))
+                Sql.ids (messages |> List.map (fun (id, _, _, _) -> id))
+                Sql.ids (messages |> List.map (fun (_, channel, _, _) -> channel))
+                Sql.ids (messages |> List.map (fun (_, _, author, _) -> author))
                 box (messages |> List.map (fun (_, _, _, posted) -> posted) |> List.toArray)
             ]
 

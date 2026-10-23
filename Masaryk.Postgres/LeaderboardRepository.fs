@@ -13,8 +13,7 @@ type LeaderboardRow =
 
 type LeaderboardRepository(dataSource: NpgsqlDataSource) =
     /// Days and period boundaries follow the server's local calendar.
-    static let since =
-        "CASE WHEN $1 = 'all' THEN '-infinity'::date ELSE date_trunc($1, now() AT TIME ZONE 'Europe/Prague')::date END"
+    static let since = $"({Sql.periodStart})::date"
 
     static let row (r: Data.Common.DbDataReader) =
         {
@@ -23,21 +22,8 @@ type LeaderboardRepository(dataSource: NpgsqlDataSource) =
             Messages = r.GetInt64 2
         }
 
-    /// The time live counting started, set on the first run.
-    member _.StartCounting() : Task<DateTime> =
-        task {
-            let! started =
-                Sql.scalar
-                    (dataSource.CreateCommand
-                        """
-                        INSERT INTO leaderboard_state (id, counting_since) VALUES (1, now())
-                        ON CONFLICT (id) DO UPDATE SET id = 1
-                        RETURNING counting_since
-                        """)
-                    []
-
-            return unbox<DateTime> started
-        }
+    member _.StartCounting() : Task<DateTimeOffset> =
+        Sql.startCounting dataSource "leaderboard_state"
 
     member _.Count(channelId: uint64, authorId: uint64, postedAt: DateTime) : Task<unit> =
         Sql.execute
@@ -49,8 +35,10 @@ type LeaderboardRepository(dataSource: NpgsqlDataSource) =
                 """)
             [ box (decimal channelId); box (decimal authorId); box postedAt ]
 
-    /// The top 10 users, plus the two users either side of memberId.
-    member _.Users(period: string, channelId: uint64 option, memberId: uint64) : Task<LeaderboardRow list> =
+    /// The `top` users, plus the users up to `around` places either side of memberId.
+    member _.Users
+        (period: string, channelId: uint64 option, memberId: uint64, top: int, around: int)
+        : Task<LeaderboardRow list> =
         Sql.query
             (dataSource.CreateCommand
                 $"""
@@ -62,17 +50,19 @@ type LeaderboardRepository(dataSource: NpgsqlDataSource) =
                     GROUP BY author_id
                 ), member AS (SELECT position FROM ranked WHERE author_id = $3)
                 SELECT position, author_id, messages FROM ranked
-                WHERE position <= 10 OR abs(position - (SELECT position FROM member)) <= 2
+                WHERE position <= $4 OR abs(position - (SELECT position FROM member)) <= $5
                 ORDER BY position
                 """)
             [
                 box period
                 Sql.optional (Option.map decimal channelId)
                 box (decimal memberId)
+                box top
+                box around
             ]
             row
 
-    member _.Channels(period: string) : Task<LeaderboardRow list> =
+    member _.Channels(period: string, top: int) : Task<LeaderboardRow list> =
         Sql.query
             (dataSource.CreateCommand
                 $"""
@@ -81,7 +71,7 @@ type LeaderboardRepository(dataSource: NpgsqlDataSource) =
                 WHERE day >= {since}
                 GROUP BY channel_id
                 ORDER BY 1
-                LIMIT 10
+                LIMIT $2
                 """)
-            [ box period ]
+            [ box period; box top ]
             row

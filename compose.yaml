@@ -1,4 +1,6 @@
-﻿services:
+﻿x-database-connection: &database-connection "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+
+services:
   masaryk.core:
     image: masaryk.core
     build:
@@ -7,7 +9,7 @@
     env_file:
       - .env
     environment:
-      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+      MASARYK_DATABASE_CONNECTION_STRING: *database-connection
     depends_on:
       masaryk.migrator:
         condition: service_completed_successfully
@@ -20,7 +22,7 @@
       context: .
       dockerfile: Masaryk.Postgres.Migrator/Dockerfile
     environment:
-      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+      MASARYK_DATABASE_CONNECTION_STRING: *database-connection
     depends_on:
       masaryk.db:
         condition: service_healthy

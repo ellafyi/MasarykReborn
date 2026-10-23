@@ -61,7 +61,7 @@ let private isSpoiler (file: Attachment) : bool =
     file.Filename.StartsWith("SPOILER_", StringComparison.Ordinal)
 
 /// Discord attachment URLs without their query parameters; other URLs unchanged.
-let imageUrl (url: string) : string =
+let private imageUrl (url: string) : string =
     match Uri.TryCreate(url, UriKind.Absolute) with
     | true, uri when
         uri.Scheme = "https"
@@ -72,7 +72,7 @@ let imageUrl (url: string) : string =
     | _ -> url
 
 /// Read a live embed's text and first image so embed-only messages still have content.
-let sourceEmbed (embed: IEmbed) : SourceEmbed =
+let private sourceEmbed (embed: IEmbed) : SourceEmbed =
     let fields = embed.Fields |> Seq.map (fun field -> $"{field.Name}: {field.Value}")
 
     {
@@ -182,3 +182,6 @@ let build (marker: string) (message: Message) : EmbedBuilder =
     |> Option.iter (fun url -> embed.WithImageUrl(imageUrl url) |> ignore)
 
     embed
+
+let jumpButton (message: IMessage) : MessageComponent =
+    ComponentBuilder().WithButton("Jump to message", style = ButtonStyle.Link, url = message.GetJumpUrl()).Build()

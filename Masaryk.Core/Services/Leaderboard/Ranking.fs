@@ -1,18 +1,14 @@
 module Masaryk.Core.Services.Leaderboard.Ranking
 
 open Discord
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
-let periods =
-    [
-        "all", "All time"
-        "year", "This year"
-        "month", "This month"
-        "week", "This week"
-    ]
+/// How many places the rankings list.
+let top = 10
 
-let private label (period: string) =
-    periods |> List.find (fst >> (=) period) |> snd
+/// How many places either side of the member their position shows.
+let around = 2
 
 let private medal (position: int64) =
     match position with
@@ -42,17 +38,22 @@ let private table (name: uint64 -> string) (highlight: uint64 option) (rows: Lea
 let users (period: string) (channelId: uint64 option) (memberId: uint64) (rows: LeaderboardRow list) : Embed =
     let mention id = $"<@{id}>"
 
-    let around =
+    let position =
         match rows |> List.tryFind (fun row -> row.Id = memberId) with
-        | Some position -> rows |> List.filter (fun row -> abs (row.Position - position.Position) <= 2L)
+        | Some position ->
+            rows
+            |> List.filter (fun row -> abs (row.Position - position.Position) <= int64 around)
         | None -> []
 
     let embed =
         EmbedBuilder()
-            .WithTitle($"Leaderboard · {label period}")
+            .WithTitle($"Leaderboard · {Period.label period}")
             .WithColor(Color.Blue)
-            .AddField("Top 10", table mention (Some memberId) (rows |> List.filter (fun row -> row.Position <= 10L)))
-            .AddField("Position", table mention (Some memberId) around)
+            .AddField(
+                $"Top {top}",
+                table mention (Some memberId) (rows |> List.filter (fun row -> row.Position <= int64 top))
+            )
+            .AddField("Position", table mention (Some memberId) position)
 
     channelId
     |> Option.iter (fun id -> embed.WithDescription($"In <#{id}>") |> ignore)
@@ -61,7 +62,7 @@ let users (period: string) (channelId: uint64 option) (memberId: uint64) (rows: 
 
 let channels (period: string) (rows: LeaderboardRow list) : Embed =
     EmbedBuilder()
-        .WithTitle($"Most active channels · {label period}")
+        .WithTitle($"Most active channels · {Period.label period}")
         .WithColor(Color.Blue)
         .WithDescription(table (fun id -> $"<#{id}>") None rows)
         .Build()

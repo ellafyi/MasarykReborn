@@ -12,7 +12,7 @@ type ReactionEvent =
     {
         ChannelId: uint64
         MessageId: uint64
-        Emoji: EmojiKey
+        Key: EmojiKey
         Added: bool
     }
 
@@ -28,7 +28,7 @@ let emoji (emote: IEmote) : Emoji =
 /// Every user who reacted, with normal and super reactions.
 let readReactors (message: IMessage) (emote: IEmote) (metadata: ReactionMetadata) : Task<Reactor list> =
     task {
-        let users = ResizeArray<Reactor>()
+        let mutable reactors = []
 
         for reactionType, count in
             [
@@ -36,20 +36,19 @@ let readReactors (message: IMessage) (emote: IEmote) (metadata: ReactionMetadata
                 ReactionType.Burst, metadata.BurstCount
             ] do
             if count > 0 then
-                use pages =
-                    message.GetReactionUsersAsync(emote, Int32.MaxValue, ``type`` = reactionType).GetAsyncEnumerator()
+                let! users =
+                    message.GetReactionUsersAsync(emote, Int32.MaxValue, ``type`` = reactionType)
+                    |> Paging.fold
+                        (fun users page ->
+                            Task.FromResult(
+                                users @ [ for user in page -> { UserId = user.Id; IsBot = user.IsBot } ],
+                                true
+                            ))
+                        []
 
-                let mutable reading = true
+                reactors <- reactors @ users
 
-                while reading do
-                    let! next = pages.MoveNextAsync()
-                    reading <- next
-
-                    if next then
-                        for user in pages.Current do
-                            users.Add({ UserId = user.Id; IsBot = user.IsBot })
-
-        return List.ofSeq users
+        return reactors
     }
 
 /// The board and qualifying emoji for a message in this guild, if it qualifies.
@@ -64,7 +63,7 @@ let evaluate
 
         match channel :> IChannel with
         | :? IGuildChannel as source when source.GuildId = guildId ->
-            match Evaluation.resolveBoard boards (Replies.parentOrSelf source) with
+            match Evaluation.resolveBoard boards (Messages.parentChannel source) with
             | None -> return None
             | Some board ->
                 // Fetch through REST; gateway caches can miss old messages or recent reactions.
@@ -88,7 +87,7 @@ let evaluate
                             )
 
                     return
-                        Evaluation.qualifyingReaction board.Threshold message.Author.Id reaction.Emoji observations
+                        Evaluation.qualifyingReaction board.Threshold message.Author.Id reaction.Key observations
                         |> Option.map (fun qualifying -> board, message, qualifying)
         | _ -> return None
     }
@@ -110,7 +109,7 @@ let subscribe (client: DiscordSocketClient) (guildId: uint64) (reactions: Mailbo
                         {
                             ChannelId = channel.Id
                             MessageId = reaction.MessageId
-                            Emoji = (emoji reaction.Emote).Key
+                            Key = (emoji reaction.Emote).Key
                             Added = added
                         }
                     )

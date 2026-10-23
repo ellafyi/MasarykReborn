@@ -19,7 +19,7 @@ type ChatRepository(dataSource: NpgsqlDataSource) =
             let! found =
                 Sql.query
                     (dataSource.CreateCommand "SELECT message_id FROM llm_reply WHERE message_id = ANY($1)")
-                    [ box (messageIds |> List.map decimal |> List.toArray) ]
+                    [ Sql.ids messageIds ]
                     (fun r -> uint64 (r.GetDecimal 0))
 
             return Set.ofList found

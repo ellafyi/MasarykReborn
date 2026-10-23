@@ -4,30 +4,26 @@ open Masaryk.Postgres
 
 [<EntryPoint>]
 let main _ =
-    let connectionString = Environment.GetEnvironmentVariable("MASARYK_DATABASE_CONNECTION_STRING")
+    let result =
+        DeployChanges.To
+            .PostgresqlDatabase(Database.connectionString ())
+            .WithScriptsEmbeddedInAssembly(
+                typeof<MigrationAssemblyMarker>.Assembly,
+                Func<string, bool>(_.Contains(".Migrations."))
+            )
+            .WithTransactionPerScript()
+            .Build()
+            .PerformUpgrade()
 
-    if String.IsNullOrWhiteSpace connectionString then
-        eprintfn "MASARYK_DATABASE_CONNECTION_STRING is missing or empty."
-        1
+    if result.Successful then
+        printfn "Database migrations completed successfully."
+        0
     else
-        try
-            let upgrader =
-                DeployChanges.To
-                    .PostgresqlDatabase(connectionString)
-                    .WithScriptsEmbeddedInAssembly(
-                        typeof<MigrationAssemblyMarker>.Assembly,
-                        Func<string, bool>(_.Contains(".Migrations.")))
-                    .WithTransactionPerScript()
-                    .Build()
-
-            let result = upgrader.PerformUpgrade()
-
-            if result.Successful then
-                printfn "Database migrations completed successfully."
-                0
+        let script =
+            if isNull result.ErrorScript then
+                ""
             else
-                eprintfn "Database migration failed. Check database connectivity and migration state."
-                1
-        with _ ->
-            eprintfn "Database migration failed. Check database connectivity and configuration."
-            1
+                $" in {result.ErrorScript.Name}"
+
+        eprintfn $"Database migration failed{script}: {result.Error.Message}"
+        1

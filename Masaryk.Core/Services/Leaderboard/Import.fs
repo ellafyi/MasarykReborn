@@ -99,7 +99,7 @@ let private fillGap
             task {
                 let counted =
                     page
-                    |> Seq.filter (fun message -> message.Id < cutoff && Counting.counts guildId message)
+                    |> Seq.filter (fun message -> message.Id < cutoff && Messages.fromMember guildId message)
                     |> Seq.map (fun message ->
                         message.Id, countedChannel, message.Author.Id, message.Timestamp.UtcDateTime)
                     |> Seq.toList
@@ -109,12 +109,12 @@ let private fillGap
             })
         0
 
-let private gap (client: DiscordRestClient) (import: LegacyImport) (guildId: uint64) (countingSince: DateTime) =
+let private gap (client: DiscordRestClient) (import: LegacyImport) (guildId: uint64) (countingSince: DateTimeOffset) =
     task {
         let! last = import.LastMessages()
         let! dumpEnd = import.DumpEnd()
         let dumpEnd = DateTimeOffset(dumpEnd)
-        let cutoff = SnowflakeUtils.ToSnowflake(DateTimeOffset(countingSince))
+        let cutoff = SnowflakeUtils.ToSnowflake countingSince
 
         let startOf id =
             last

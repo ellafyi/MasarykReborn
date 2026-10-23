@@ -54,25 +54,30 @@ let private categoryFor
         | None ->
             let! channels = guild.GetChannelsAsync()
 
-            let sizes =
-                categories
-                |> Seq.map (fun category ->
-                    category.Name,
-                    channels
-                    |> Seq.sumBy (function
-                        | :? INestedChannel as c when c.CategoryId = Nullable category.Id -> 1
-                        | _ -> 0))
-                |> Map.ofSeq
+            let size (category: ICategoryChannel) =
+                channels
+                |> Seq.sumBy (function
+                    | :? INestedChannel as c when c.CategoryId = Nullable category.Id -> 1
+                    | _ -> 0)
 
-            let name = Channels.roomIn wanted sizes
+            // Names can repeat, so look for room in each category with the name, not the first one.
+            let name, roomy =
+                Channels.numbered wanted
+                |> Seq.pick (fun name ->
+                    let named = categories |> Seq.filter (fun c -> c.Name = name) |> List.ofSeq
 
-            match categories |> Seq.tryFind (fun c -> c.Name = name) with
+                    match named |> List.tryFind (fun c -> size c < Channels.categorySize) with
+                    | Some category -> Some(name, Some category)
+                    | None when named.IsEmpty -> Some(name, None)
+                    | None -> None)
+
+            match roomy with
             | Some category -> return category
             | None -> return! guild.CreateCategoryAsync name
     }
 
 type Creation =
-    | Created of ITextChannel
+    | Created of uint64
     | Exists of uint64
 
 /// Create the course's channel in its category, opening a numbered category when it is full.
@@ -98,7 +103,7 @@ let create (repository: CourseRepository) (home: string option) (guild: IGuild) 
                 )
 
             do! repository.Link(course.Id, channel.Id)
-            return Created channel
+            return Created channel.Id
         | channel -> return Exists channel.Id
     }
 

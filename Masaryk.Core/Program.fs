@@ -118,7 +118,11 @@ let run (database: NpgsqlDataSource) : Task<unit> =
             let! featureCommands = start context
             commands <- commands @ featureCommands
 
-        let commandsByName = CommandRegistry.byName commands
+        let commandsByName =
+            match commands |> List.countBy _.Name |> List.tryFind (fun (_, count) -> count > 1) with
+            | Some(name, _) -> invalidOp $"Duplicate command name: {name}"
+            | None -> commands |> List.map (fun command -> command.Name, command) |> Map.ofList
+
         client.add_Log (Func<LogMessage, Task>(log))
         client.add_Ready (Func<Task>(clientReady commands))
         client.add_SlashCommandExecuted (Func<SocketSlashCommand, Task>(slashCommandHandler commandsByName))

@@ -42,10 +42,10 @@ let read
                     |> Seq.choose (fun post ->
                         post.Embeds
                         |> Seq.tryPick (fun embed -> Option.ofObj embed.Description |> Option.bind (original guildId))
-                        |> Option.map (fun source -> source, boardChannel, post.Id))
+                        |> Option.map (fun source -> source, post.Id))
                     |> Seq.toList
 
-                let! added = repository.SaveLegacy posts
+                let! added = repository.SaveLegacy(boardChannel, posts)
 
                 let result =
                     {

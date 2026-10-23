@@ -8,7 +8,6 @@ let start: Feature =
     fun context ->
         task {
             let repository = StarboardRepository(context.Database)
-            printfn $"Starboard: {context.Configuration.Current.Boards.Length} boards."
 
             Worker.start
                 (fun (reaction: DiscordAdapter.ReactionEvent) ->

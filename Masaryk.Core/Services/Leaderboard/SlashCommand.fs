@@ -1,83 +1,42 @@
 module Masaryk.Core.Services.Leaderboard.SlashCommand
 
 open System
-open System.Collections.Concurrent
 open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
 open Masaryk.Core
-open Masaryk.Core.Services.Leaderboard
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
-let private cooldown = TimeSpan.FromSeconds 10.0
+let private reply (repository: LeaderboardRepository) (interaction: SocketSlashCommand) : Task =
+    task {
+        do! interaction.DeferAsync()
+        let subcommand, value = Options.input interaction
+        let period = Period.read value
 
-let private periodOption () =
-    let period =
-        Options.option "period" "Time period (default: all time)" ApplicationCommandOptionType.String
+        let send (embed: Embed) =
+            interaction.FollowupAsync(embed = embed, allowedMentions = AllowedMentions.None) :> Task
 
-    for value, name in Ranking.periods do
-        period.AddChoice(name, value) |> ignore
+        match subcommand with
+        | "channels" ->
+            let! rows = repository.Channels(period, Ranking.top)
+            do! send (Ranking.channels period rows)
+        | _ ->
+            let memberId =
+                value "member"
+                |> Option.map (fun user -> (user :?> IUser).Id)
+                |> Option.defaultValue interaction.User.Id
 
-    period
+            let channelId =
+                value "channel" |> Option.map (fun channel -> (channel :?> IChannel).Id)
+
+            let! rows =
+                repository.Users(period, channelId, memberId, Ranking.top, Ranking.around)
+
+            do! send (Ranking.users period channelId memberId rows)
+    }
 
 let command (repository: LeaderboardRepository) : Command =
-    let lastUse = ConcurrentDictionary<uint64, DateTimeOffset>()
-
-    let handle (interaction: SocketSlashCommand) : Task =
-        task {
-            let now = DateTimeOffset.UtcNow
-
-            match lastUse.TryGetValue interaction.User.Id with
-            | true, last when now - last < cooldown ->
-                let again =
-                    TimestampTag.FromDateTimeOffset(last + cooldown, TimestampTagStyles.Relative)
-
-                do! interaction.RespondAsync($"You can use this again {again}.", ephemeral = true)
-            | _ ->
-                lastUse[interaction.User.Id] <- now
-                do! interaction.DeferAsync()
-                let subcommand, option = Options.input interaction
-                let period = option "period" |> Option.map string |> Option.defaultValue "all"
-
-                let! embed =
-                    if subcommand = "channels" then
-                        task {
-                            let! rows = repository.Channels period
-                            return Ranking.channels period rows
-                        }
-                    else
-                        let memberId =
-                            option "member"
-                            |> Option.map (fun user -> (user :?> IUser).Id)
-                            |> Option.defaultValue interaction.User.Id
-
-                        let channelId =
-                            option "channel" |> Option.map (fun channel -> (channel :?> IChannel).Id)
-
-                        task {
-                            let! rows = repository.Users(period, channelId, memberId)
-                            return Ranking.users period channelId memberId rows
-                        }
-
-                do! interaction.FollowupAsync(embed = embed, allowedMentions = AllowedMentions.None) :> Task
-        }
-
-    let channel =
-        Options.option
-            "channel"
-            "Only count messages in this channel, including its threads"
-            ApplicationCommandOptionType.Channel
-
-    for kind in
-        [
-            ChannelType.Text
-            ChannelType.News
-            ChannelType.Forum
-            ChannelType.Voice
-            ChannelType.Stage
-        ] do
-        channel.AddChannelType(kind) |> ignore
-
     {
         Name = "leaderboard"
         Description = "Who sends the most messages"
@@ -91,11 +50,11 @@ let command (repository: LeaderboardRepository) : Command =
                             "member"
                             "Whose position to show (default: you)"
                             ApplicationCommandOptionType.User
-                        channel
-                        periodOption ()
+                        Options.channelFilter "Only count messages in this channel, including its threads"
+                        Period.option ()
                     ]
-                Options.subcommand "channels" "Most active channels" [ periodOption () ]
+                Options.subcommand "channels" "Most active channels" [ Period.option () ]
             ]
         Permission = None
-        Handle = handle
+        Handle = Cooldown.limit (TimeSpan.FromSeconds 10.0) (reply repository)
     }

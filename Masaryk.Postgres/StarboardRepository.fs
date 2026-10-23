@@ -20,11 +20,9 @@ type StarboardRecord =
     | Legacy
 
 type StarboardRepository(dataSource: NpgsqlDataSource) =
-    let command (sql: string) = dataSource.CreateCommand sql
-
     member _.Find(sourceMessageId: uint64) : Task<StarboardRecord option> =
         Sql.queryOne
-            (command
+            (dataSource.CreateCommand
                 "SELECT target_channel_id, post_message_id, emoji, count FROM starboard_post WHERE source_message_id = $1")
             [ box (decimal sourceMessageId) ]
             (fun r ->
@@ -41,7 +39,7 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
 
     member _.Save(sourceMessageId: uint64, post: StarboardPost) : Task<unit> =
         Sql.execute
-            (command
+            (dataSource.CreateCommand
                 "INSERT INTO starboard_post (source_message_id, target_channel_id, post_message_id, emoji, count) VALUES ($1, $2, $3, $4, $5)")
             [
                 box (decimal sourceMessageId)
@@ -53,22 +51,21 @@ type StarboardRepository(dataSource: NpgsqlDataSource) =
 
     member _.SetCount(sourceMessageId: uint64, count: int) : Task<unit> =
         Sql.execute
-            (command "UPDATE starboard_post SET count = $2 WHERE source_message_id = $1")
+            (dataSource.CreateCommand "UPDATE starboard_post SET count = $2 WHERE source_message_id = $1")
             [ box (decimal sourceMessageId); box count ]
 
-    /// Record the old bot's posts as (source message, the new board's channel, old post)
-    /// and return how many were new.
-    member _.SaveLegacy(posts: (uint64 * uint64 * uint64) list) : Task<int> =
-        let sources, channels, posts = List.unzip3 posts
-
-        let column (ids: uint64 list) =
-            ids |> List.map decimal |> List.toArray |> box
-
+    /// Record the old bot's posts on the board in `targetChannelId` as (source message, old post)
+    /// pairs and return how many were new.
+    member _.SaveLegacy(targetChannelId: uint64, posts: (uint64 * uint64) list) : Task<int> =
         Sql.affected
-            (command
+            (dataSource.CreateCommand
                 """
                 INSERT INTO starboard_post (source_message_id, target_channel_id, post_message_id)
-                SELECT * FROM unnest($1::numeric[], $2::numeric[], $3::numeric[])
+                SELECT source, $1, post FROM unnest($2::numeric[], $3::numeric[]) AS t (source, post)
                 ON CONFLICT (source_message_id) DO NOTHING
                 """)
-            [ column sources; column channels; column posts ]
+            [
+                box (decimal targetChannelId)
+                Sql.ids (List.map fst posts)
+                Sql.ids (List.map snd posts)
+            ]

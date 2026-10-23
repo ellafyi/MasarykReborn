@@ -15,7 +15,10 @@ let private name = "courses"
 let private find (repository: CourseRepository) (home: string option) (value: string) =
     match value.Split(':', 2) with
     | [| faculty; code |] -> repository.Find(faculty.Trim(), code.Trim())
-    | _ -> repository.Find(Option.defaultValue "" home, value.Trim())
+    | _ ->
+        home
+        |> Option.map (fun home -> repository.Find(home, value.Trim()))
+        |> Option.defaultValue (Task.FromResult None)
 
 let autocomplete
     (repository: CourseRepository)
@@ -36,7 +39,7 @@ let autocomplete
                         |> List.map (fun f -> AutocompleteResult(f, f))
                     )
             else
-                let! courses = repository.Search(typed, Option.defaultValue "" (home ()))
+                let! courses = repository.Search(typed, home ())
 
                 do!
                     interaction.RespondAsync(
@@ -59,8 +62,9 @@ let private page (repository: CourseRepository) (faculty: string option) (number
 
 let turnPage (repository: CourseRepository) (interaction: SocketMessageComponent) : Task =
     task {
-        match Listing.parseButton interaction.Data.CustomId with
+        match Pager.parse Listing.prefix interaction.Data.CustomId with
         | Some(faculty, number) ->
+            let faculty = if faculty = "" then None else Some faculty
             let! embed, buttons = page repository faculty number
 
             do!
@@ -145,7 +149,7 @@ let command (repository: CourseRepository) (guild: unit -> IGuild) (home: unit -
                     withCourse (fun course ->
                         task {
                             match! Guild.create repository home (guild ()) course with
-                            | Guild.Created channel -> return $"Created <#{channel.Id}>."
+                            | Guild.Created id -> return $"Created <#{id}>."
                             | Guild.Exists id -> return $"{course.Code} already has <#{id}>."
                         })
         }

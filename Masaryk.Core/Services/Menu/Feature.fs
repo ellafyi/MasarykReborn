@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Discord.WebSocket
 open Masaryk.Core
+open Masaryk.Core.Services.Shared
 
 let private show (context: Context) (interaction: SocketSlashCommand) : Task =
     task {
@@ -19,8 +20,8 @@ let private show (context: Context) (interaction: SocketSlashCommand) : Task =
 
 let private turnPage (context: Context) (interaction: SocketMessageComponent) : Task =
     task {
-        match Rendering.parseButton interaction.Data.CustomId with
-        | Some page ->
+        match Pager.parse Rendering.prefix interaction.Data.CustomId with
+        | Some(_, page) ->
             do! interaction.DeferAsync()
             let! menus = Fetching.get context.Configuration.Current.Restaurants
             let content, embeds, buttons = Rendering.render menus page

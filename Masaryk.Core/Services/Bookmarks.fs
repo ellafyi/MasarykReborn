@@ -10,7 +10,7 @@ open Masaryk.Core.Services.Shared
 open Masaryk.Core
 
 /// :bookmark: from Discord's default emoji set.
-let private saveEmoji = "🔖"
+let private saveEmoji = set [ "🔖" ]
 
 /// :wastebasket:. Discord may send it with or without the emoji presentation selector.
 let private deleteEmoji = set [ "🗑️"; "🗑" ]
@@ -41,8 +41,7 @@ let private isEmoji (names: Set<string>) (emote: IEmote) : bool =
 /// Save from this guild's channels and threads; delete only inside DMs.
 let action (emote: IEmote) (channel: IChannel) (guildId: uint64) : Action =
     match channel with
-    | :? IGuildChannel as guildChannel when guildChannel.GuildId = guildId && isEmoji (set [ saveEmoji ]) emote ->
-        Action.Save
+    | :? IGuildChannel as guildChannel when guildChannel.GuildId = guildId && isEmoji saveEmoji emote -> Action.Save
     | :? IDMChannel when isEmoji deleteEmoji emote -> Action.Delete
     | _ -> Action.Ignore
 
@@ -59,10 +58,7 @@ let render (message: IMessage) : Embed * MessageComponent =
             .AddField("Saved from", $"<#{message.Channel.Id}>")
             .Build()
 
-    let components =
-        ComponentBuilder().WithButton("Jump to message", style = ButtonStyle.Link, url = message.GetJumpUrl()).Build()
-
-    embed, components
+    embed, MessageEmbed.jumpButton message
 
 let private save (client: DiscordSocketClient) (channel: IMessageChannel) (request: Request) : Task<unit> =
     task {
@@ -80,8 +76,7 @@ let private save (client: DiscordSocketClient) (channel: IMessageChannel) (reque
                     dm.SendMessageAsync(embed = embed, components = components, allowedMentions = AllowedMentions.None)
 
                 printfn $"Bookmark: sent {request.ChannelId}/{request.MessageId} to user {request.UserId}."
-            // 50007: the user doesn't accept DMs from server members or has blocked the bot.
-            with :? HttpException as error when error.DiscordCode.HasValue && int error.DiscordCode.Value = 50007 ->
+            with :? HttpException as error when error.DiscordCode = Nullable DiscordErrorCode.CannotSendMessageToUser ->
                 printfn $"Bookmark: user {request.UserId} does not accept DMs."
     }
 
@@ -114,7 +109,7 @@ let subscribe (client: DiscordSocketClient) (requests: MailboxProcessor<Request>
         : Task =
         let fromBot = reaction.User.IsSpecified && reaction.User.Value.IsBot
 
-        if not fromBot && isEmoji (deleteEmoji.Add saveEmoji) reaction.Emote then
+        if not fromBot && isEmoji (saveEmoji + deleteEmoji) reaction.Emote then
             requests.Post(
                 {
                     ChannelId = channel.Id

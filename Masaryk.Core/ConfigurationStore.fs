@@ -22,7 +22,9 @@ type ConfigurationStore(repository: ConfigurationRepository, guildId: uint64) =
                     | Ok(_, configuration) -> state <- version, configuration
                     | Error problems ->
                         let problems = String.concat "; " problems
-                        printfn $"Configuration version {version} doesn't load, keeping version {fst state}: {problems}"
+
+                        eprintfn
+                            $"Configuration version {version} doesn't load, keeping version {fst state}: {problems}"
             with error ->
-                printfn $"Configuration couldn't be read: {error.Message}"
+                eprintfn $"Configuration couldn't be read: {error.Message}"
         }

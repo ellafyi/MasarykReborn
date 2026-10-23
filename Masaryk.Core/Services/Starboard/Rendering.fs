@@ -32,18 +32,20 @@ let create (message: IMessage) (parents: IMessage list) (reaction: QualifyingRea
     let source = MessageEmbed.fromMessage message
 
     let embed =
-        if parents.IsEmpty then
-            MessageEmbed.build "" source
-        else
-            MessageEmbed.build
-                ""
-                { source with
-                    Content = $"{replyEmoji} {source.Content}"
-                }
+        MessageEmbed.build
+            ""
+            (if parents.IsEmpty then
+                 source
+             else
+                 { source with
+                     Content = $"{replyEmoji} {source.Content}"
+                 })
 
-    if not parents.IsEmpty then
+    let room = EmbedBuilder.MaxDescriptionLength - embed.Description.Length
+
+    // The chain needs room for at least "…" and a line break above the starred message.
+    if not parents.IsEmpty && room >= 2 then
         // The starred message has priority; keep the newest replies that fit above it.
-        let room = EmbedBuilder.MaxDescriptionLength - embed.Description.Length
         let lines = parents |> List.rev |> List.map chainLine
 
         let fitting =
@@ -69,7 +71,4 @@ let create (message: IMessage) (parents: IMessage list) (reaction: QualifyingRea
     embed.AddField(reactionsField, reactions reaction.Emoji.Text reaction.EligibleCount message.Channel.Id)
     |> ignore
 
-    let jump =
-        ComponentBuilder().WithButton("Jump to message", style = ButtonStyle.Link, url = message.GetJumpUrl()).Build()
-
-    embed.Build(), jump
+    embed.Build(), MessageEmbed.jumpButton message

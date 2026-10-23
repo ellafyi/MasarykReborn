@@ -60,7 +60,7 @@ let private update
             | true, custom -> custom :> IEmote
             | _ -> Discord.Emoji posted.Emoji
 
-        if (emoji emote).Key = reaction.Emoji then
+        if (emoji emote).Key = reaction.Key then
             let! source = channel client reaction.ChannelId
             let! message = source.GetMessageAsync(reaction.MessageId)
             let! target = channel client posted.TargetChannelId
@@ -72,7 +72,7 @@ let private update
                 let! reactors =
                     match
                         message.Reactions
-                        |> Seq.tryFind (fun pair -> (emoji pair.Key).Key = reaction.Emoji)
+                        |> Seq.tryFind (fun pair -> (emoji pair.Key).Key = reaction.Key)
                     with
                     | Some pair -> readReactors message pair.Key pair.Value
                     | None -> Task.FromResult []

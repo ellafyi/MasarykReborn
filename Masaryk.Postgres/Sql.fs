@@ -15,6 +15,15 @@ let optional (value: 'T option) : obj =
 let readOptional (reader: DbDataReader) (index: int) (read: int -> 'T) : 'T option =
     if reader.IsDBNull index then None else Some(read index)
 
+/// Discord IDs as a `numeric[]` parameter.
+let ids (values: uint64 seq) : obj =
+    values |> Seq.map decimal |> Seq.toArray |> box
+
+/// The start of the period in $1 ("all", "year", "month" or "week") as a local Prague
+/// timestamp; "all" is -infinity.
+let periodStart =
+    "CASE WHEN $1 = 'all' THEN '-infinity'::timestamp ELSE date_trunc($1, now() AT TIME ZONE 'Europe/Prague') END"
+
 /// Bind values to $1, $2, etc. in list order, then return the same command.
 /// This only adds parameters; it doesn't call Npgsql's Prepare method.
 let prepare (command: NpgsqlCommand) (values: obj seq) : NpgsqlCommand =
@@ -57,14 +66,9 @@ let query (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) 
         use command = prepare command values
         use! reader = command.ExecuteReaderAsync()
         let results = ResizeArray()
-        let mutable hasRow = true
 
-        while hasRow do
-            let! next = reader.ReadAsync()
-            hasRow <- next
-
-            if next then
-                results.Add(read reader)
+        while! reader.ReadAsync() do
+            results.Add(read reader)
 
         return List.ofSeq results
     }
@@ -76,4 +80,20 @@ let queryOne (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> '
         use! reader = command.ExecuteReaderAsync()
         let! found = reader.ReadAsync()
         return if found then Some(read reader) else None
+    }
+
+/// When live counting started for a feature, recorded in its single-row state table on the first run.
+let startCounting (dataSource: NpgsqlDataSource) (stateTable: string) : Task<DateTimeOffset> =
+    task {
+        let! started =
+            scalar
+                (dataSource.CreateCommand
+                    $"""
+                    INSERT INTO {stateTable} (id, counting_since) VALUES (1, now())
+                    ON CONFLICT (id) DO UPDATE SET id = 1
+                    RETURNING counting_since
+                    """)
+                []
+
+        return DateTimeOffset(unbox<DateTime> started)
     }

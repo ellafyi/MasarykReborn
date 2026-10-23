@@ -3,6 +3,8 @@
 #
 # Deploy the inference stack (MasarykTraining) first: it creates the `masaryk` network
 # that the bot joins to reach the language model at http://masaryk:8000/v1.
+x-database-connection: &database-connection "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
+
 services:
   masaryk.core:
     image: masaryk.core
@@ -17,7 +19,7 @@ services:
       LLM_API_URL: "${LLM_API_URL-http://masaryk:8000/v1}"
       LLM_API_KEY: "${LLM_API_KEY:-}"
       LLM_MODEL: "${LLM_MODEL:-masaryk}"
-      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
+      MASARYK_DATABASE_CONNECTION_STRING: *database-connection
     depends_on:
       masaryk.migrator:
         condition: service_completed_successfully
@@ -33,7 +35,7 @@ services:
     pull_policy: build
     restart: "no"
     environment:
-      MASARYK_DATABASE_CONNECTION_STRING: "Host=masaryk.db;Port=5432;Database=${POSTGRES_DB:-masaryk};Username=${POSTGRES_USER:-masaryk};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};GSS Encryption Mode=Disable"
+      MASARYK_DATABASE_CONNECTION_STRING: *database-connection
     depends_on:
       masaryk.db:
         condition: service_healthy

@@ -29,8 +29,8 @@ let private fetch (day: DateOnly) (lepsiMenu: Lazy<Task<string>>) (restaurant: R
     task {
         try
             match restaurant.Source with
-            | Menicka _ ->
-                let! html = http.GetStringAsync restaurant.Url
+            | Menicka id ->
+                let! html = http.GetStringAsync $"https://www.menicka.cz/{id}.html"
                 return Items(Parsing.menicka day html)
             | LepsiMenu id ->
                 let! json = lepsiMenu.Value
@@ -46,7 +46,7 @@ let private fetch (day: DateOnly) (lepsiMenu: Lazy<Task<string>>) (restaurant: R
                 return Items(Parsing.tao day html)
             | Link -> return LinkOnly
         with error ->
-            printfn $"Menu: {restaurant.Name} failed: {error.Message}"
+            eprintfn $"Menu: {restaurant.Name} failed: {error.Message}"
             return Unavailable
     }
 
