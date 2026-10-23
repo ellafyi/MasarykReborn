@@ -28,7 +28,6 @@ let private everyoneCanSee (channel: SocketTextChannel) =
 
     everyone.Permissions.ViewChannel && not denied
 
-/// Settings that point at channels this server doesn't have.
 let private missingChannels (guild: SocketGuild) (configuration: Configuration) =
     let exists id = not (isNull (guild.GetChannel id))
 

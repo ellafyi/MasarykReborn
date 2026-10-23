@@ -1,4 +1,5 @@
 /// Small helpers for parameterized Npgsql commands, shared by the repositories.
+/// The helpers that run a command dispose it, and its reader, when they finish.
 module internal Masaryk.Postgres.Sql
 
 open System
@@ -27,7 +28,7 @@ let command (transaction: NpgsqlTransaction) (sql: string) =
     new NpgsqlCommand(sql, transaction.Connection, transaction)
 
 /// Run the query and return its first value, such as an ID from INSERT ... RETURNING.
-/// Return null if no rows match. Dispose the command when done.
+/// Return null if no rows match.
 let scalar (command: NpgsqlCommand) (values: obj seq) : Task<obj> =
     task {
         use command = prepare command values
@@ -35,7 +36,6 @@ let scalar (command: NpgsqlCommand) (values: obj seq) : Task<obj> =
     }
 
 /// Run a SQL statement and ignore how many rows it changes.
-/// Dispose the command when done.
 let execute (command: NpgsqlCommand) (values: obj seq) : Task<unit> =
     task {
         use command = prepare command values
@@ -51,7 +51,7 @@ let affected (command: NpgsqlCommand) (values: obj seq) : Task<int> =
     }
 
 /// Call read for each result row and return the results as a list.
-/// Return [] if no rows match. Dispose the reader and command when done.
+/// Return [] if no rows match.
 let query (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) : Task<'T list> =
     task {
         use command = prepare command values
@@ -70,7 +70,6 @@ let query (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) 
     }
 
 /// Call read for the first result row, or return None if no rows match.
-/// Dispose the reader and command when done.
 let queryOne (command: NpgsqlCommand) (values: obj seq) (read: DbDataReader -> 'T) : Task<'T option> =
     task {
         use command = prepare command values

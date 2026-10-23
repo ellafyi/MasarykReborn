@@ -81,8 +81,6 @@ CREATE TABLE faculty
     name         text,
     sync_enabled boolean NOT NULL DEFAULT true
 );
--- A row represents a successful import. The future importer must insert it and
--- its complete set of revisions atomically.
 CREATE TABLE catalog_import
 (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -106,9 +104,6 @@ CREATE TABLE course_offering
     term      text   NOT NULL,
     UNIQUE (course_id, term)
 );
--- Store a full snapshot on first sight of an offering and only when its state
--- later changes. An unchanged offering has no row for that import. A change to
--- absence uses present_in_export = false with name and description null.
 CREATE TABLE course_revision
 (
     id                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

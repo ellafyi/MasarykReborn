@@ -60,7 +60,7 @@ let shorten (limit: int) (value: string) : string =
 let private isSpoiler (file: Attachment) : bool =
     file.Filename.StartsWith("SPOILER_", StringComparison.Ordinal)
 
-/// Strip parameters only when rendering a Discord attachment URL in an image field.
+/// Discord attachment URLs without their query parameters; other URLs unchanged.
 let imageUrl (url: string) : string =
     match Uri.TryCreate(url, UriKind.Absolute) with
     | true, uri when

@@ -12,7 +12,7 @@ type LeaderboardRow =
     }
 
 type LeaderboardRepository(dataSource: NpgsqlDataSource) =
-    // Days and period boundaries follow the server's local calendar.
+    /// Days and period boundaries follow the server's local calendar.
     static let since =
         "CASE WHEN $1 = 'all' THEN '-infinity'::date ELSE date_trunc($1, now() AT TIME ZONE 'Europe/Prague')::date END"
 

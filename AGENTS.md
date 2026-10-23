@@ -33,7 +33,7 @@ docker compose logs -f masaryk.core
 - Admin-only commands set `Permission = Some GuildPermission.Administrator`. `Program.fs` checks it again on every call, so Discord's per-server overrides don't widen access.
 - Slash commands are registered on the one guild only; handlers for events must ignore other guilds.
 - Gateway handlers don't do slow work: queue it through `Services/Shared/Worker.fs`.
-- Migrations are numbered `NNN_name.sql`, run in order, one transaction each. Never edit an applied one; add a new one, and add it as an `EmbeddedResource` in `Masaryk.Postgres.fsproj`. Scripts are listed by hand, so an unlisted file is silently never run.
+- Migrations are numbered `NNN_name.sql`, run in order, one transaction each. Never change the SQL of an applied one; add a new one, and add it as an `EmbeddedResource` in `Masaryk.Postgres.fsproj`. Scripts are listed by hand, so an unlisted file is silently never run. Editing only comments in an applied one is safe: DbUp tracks scripts by name, not content.
 - Settings come from environment variables: `BOT_TOKEN`, `GUILD_ID`, `MASARYK_DATABASE_CONNECTION_STRING`, optional `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`. Compose builds the connection string from the `POSTGRES_*` variables.
 - Commit messages follow `type: summary` (`feat:`, `fix:`, `refactor:`, `build:`).
 

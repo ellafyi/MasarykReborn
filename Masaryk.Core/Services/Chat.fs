@@ -74,7 +74,7 @@ let complete (settings: Settings) (messages: Message list) : Task<string> =
         return choice.GetProperty("message").GetProperty("content").GetString()
     }
 
-// Discord also counts the replied-to author as mentioned, so check the text.
+/// Discord also counts the replied-to author as mentioned, so check the text.
 let private mentionsBot (botId: uint64) (message: IMessage) = message.Content.Contains $"<@{botId}>"
 
 let isCandidate (botId: uint64) (guildId: uint64) (message: IMessage) : bool =
@@ -87,7 +87,7 @@ let isCandidate (botId: uint64) (guildId: uint64) (message: IMessage) : bool =
 
 let private urls = Regex(@"https?://\S+|www\.\S+")
 
-// The model never saw mention markup or URLs in training.
+/// The model never saw mention markup or URLs in training.
 let text (botId: uint64) (message: IMessage) : string =
     let content = StringBuilder(message.Content)
 
@@ -106,7 +106,7 @@ let text (botId: uint64) (message: IMessage) : string =
 
     urls.Replace(string content, "").Trim()
 
-// Neutral names keep Discord usernames and IDs off the server.
+/// Neutral names keep Discord usernames and IDs off the server.
 let build (botId: uint64) (modelReplies: Set<uint64>) (messages: IMessage list) : Message list =
     let names = Dictionary<uint64, string>()
 

@@ -52,7 +52,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
            && value.GetString().StartsWith '<'
            && value.GetString().EndsWith '>'
 
-    /// Report unknown keys, then read the object with `build`.
+    // Report unknown keys, then read the object with `build`.
     let record (known: string list) (build: string * JsonElement -> 'T) path (value: JsonElement) : 'T =
         if value.ValueKind <> JsonValueKind.Object then
             fail path "must be an object"
@@ -71,7 +71,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
         | true, value when value.ValueKind <> JsonValueKind.Null -> convert path value
         | _ -> fail path "is missing"
 
-    /// A missing key gets `fallback`; a placeholder or null means unset.
+    // A missing key gets `fallback`; a placeholder or null means unset.
     let optional
         (path, value: JsonElement)
         (name: string)
@@ -180,7 +180,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                 Source = need o "source" source
             })
 
-    /// A section object holding a single setting.
+    // A section object holding a single setting.
     let section (path, value: JsonElement) (name: string) key (fallback: 'T option) convert =
         match value.TryGetProperty name with
         | true, value -> record [ key ] (fun s -> optional s key fallback convert) (at path name) value

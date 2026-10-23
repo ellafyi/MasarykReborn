@@ -57,7 +57,6 @@ let private page (repository: CourseRepository) (faculty: string option) (number
         return Listing.render faculty number courses total
     }
 
-/// Turn a `/courses list` page.
 let turnPage (repository: CourseRepository) (interaction: SocketMessageComponent) : Task =
     task {
         match Listing.parseButton interaction.Data.CustomId with
