@@ -224,7 +224,13 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                         match (snd o).TryGetProperty "courses" with
                         | true, value ->
                             record
-                                [ "homeFaculty"; "interestChannel"; "minimumMembers"; "showAllRole" ]
+                                [
+                                    "homeFaculty"
+                                    "interestChannel"
+                                    "minimumMembers"
+                                    "showAllRole"
+                                    "inactiveDays"
+                                ]
                                 (fun s ->
                                     {
                                         HomeFaculty = optional s "homeFaculty" fallback.HomeFaculty text
@@ -234,6 +240,7 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                                             optional s "minimumMembers" None positive
                                             |> Option.defaultValue fallback.MinimumMembers
                                         ShowAllRole = optional s "showAllRole" fallback.ShowAllRole discordId
+                                        InactiveDays = optional s "inactiveDays" fallback.InactiveDays positive
                                     })
                                 "courses"
                                 value
@@ -328,6 +335,11 @@ let export (version: int64) (configuration: Configuration) : string =
 
     let showAllRole = discordId "\"<role ID>\"" configuration.Courses.ShowAllRole
 
+    let inactiveDays =
+        configuration.Courses.InactiveDays
+        |> Option.map string
+        |> Option.defaultValue "null"
+
     let boards = configuration.Boards |> List.map boardJson |> String.concat ","
 
     let lockoutId (pick: LockoutSettings -> uint64) placeholder =
@@ -372,7 +384,11 @@ let export (version: int64) (configuration: Configuration) : string =
     "interestChannel": {{interestChannel}},
     "minimumMembers": {{configuration.Courses.MinimumMembers}},
     // Optional: a role that sees every course channel, e.g. for moderators.
-    "showAllRole": {{showAllRole}}
+    "showAllRole": {{showAllRole}},
+    // Members who haven't written anywhere for this many days lose their course channels and get
+    // a DM saying how to join again. null turns this off. It starts only after an admin has looked
+    // at /courses prune.
+    "inactiveDays": {{inactiveDays}}
   },
 
   "lockout": {

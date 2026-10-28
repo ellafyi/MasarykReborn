@@ -129,6 +129,7 @@ let command
     (guild: unit -> IGuild)
     (settings: unit -> CourseSettings)
     (queue: Queue)
+    (prune: bool -> Task<string>)
     : Command =
     let handle (interaction: SocketSlashCommand) : Task =
         task {
@@ -163,6 +164,9 @@ let command
 
                             return report matching
                         })
+            | "prune" ->
+                let now = value "now" |> Option.map unbox<bool> |> Option.defaultValue false
+                do! reply queue true interaction "/courses prune" (fun () -> prune now)
             | "recover" ->
                 do!
                     answer (fun () ->
@@ -217,6 +221,15 @@ let command
                     ]
                 subcommand "match" "Link channels named after courses in the catalog" []
                 subcommand "recover" "Add members of linked channels from their own channel permissions" []
+                subcommand
+                    "prune"
+                    "Who the daily cleanup would take out of course channels"
+                    [
+                        option
+                            "now"
+                            "Run the cleanup right away instead of only reporting"
+                            ApplicationCommandOptionType.Boolean
+                    ]
                 subcommand
                     "link"
                     "Link a course to an existing channel"

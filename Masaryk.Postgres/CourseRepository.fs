@@ -215,3 +215,46 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
 
     member _.RemoveRequest(courseId: int64) : Task<unit> =
         Sql.execute (dataSource.CreateCommand "DELETE FROM course_request WHERE course_id = $1") [ box courseId ]
+
+    /// Every course membership as course and member.
+    member _.Memberships() : Task<(int64 * uint64) list> =
+        Sql.query
+            (dataSource.CreateCommand "SELECT course_id, user_id FROM course_member ORDER BY user_id, course_id")
+            []
+            (fun r -> r.GetInt64 0, uint64 (r.GetDecimal 1))
+
+    /// Memberships of members whose latest message anywhere, or joining the course when that's
+    /// later, is older than `days`. Members locked out with /touch-grass are silent on purpose.
+    member _.Inactive(days: int) : Task<(int64 * uint64) list> =
+        Sql.query
+            (dataSource.CreateCommand
+                """
+                WITH latest AS (
+                    SELECT author_id, max(day) AS day FROM message_count
+                    WHERE author_id IN (SELECT user_id FROM course_member)
+                    GROUP BY author_id
+                )
+                SELECT m.course_id, m.user_id
+                FROM course_member m
+                LEFT JOIN latest l ON l.author_id = m.user_id
+                WHERE greatest(l.day, (m.joined_at AT TIME ZONE 'Europe/Prague')::date)
+                      < (now() AT TIME ZONE 'Europe/Prague')::date - $1::int
+                  AND m.user_id NOT IN (SELECT user_id FROM lockout)
+                ORDER BY m.user_id, m.course_id
+                """)
+            [ box days ]
+            (fun r -> r.GetInt64 0, uint64 (r.GetDecimal 1))
+
+    member _.PruneReviewed() : Task<bool> =
+        task {
+            let! reviewed =
+                Sql.scalar (dataSource.CreateCommand "SELECT count(*) FROM course_prune_state") []
+
+            return unbox<int64> reviewed > 0L
+        }
+
+    member _.MarkPruneReviewed() : Task<unit> =
+        Sql.execute
+            (dataSource.CreateCommand
+                "INSERT INTO course_prune_state (id, reviewed_at) VALUES (1, now()) ON CONFLICT (id) DO NOTHING")
+            []

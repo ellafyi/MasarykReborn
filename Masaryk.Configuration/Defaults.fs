@@ -50,6 +50,7 @@ let configuration: Configuration =
                 InterestChannel = None
                 MinimumMembers = 10
                 ShowAllRole = None
+                InactiveDays = Some 365
             }
         Restaurants = restaurants
         Lockout = None

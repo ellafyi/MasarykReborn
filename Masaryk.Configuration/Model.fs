@@ -50,6 +50,8 @@ type CourseSettings =
         MinimumMembers: int
         /// A role that sees every course channel.
         ShowAllRole: uint64 option
+        /// Members silent this long lose their course channels. Unset turns the cleanup off.
+        InactiveDays: int option
     }
 
 /// Everything a server's admins can change about the bot.

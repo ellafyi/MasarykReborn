@@ -49,9 +49,28 @@ let start: Feature =
 
             Refresh.run context |> ignore
 
+            let server () = context.Client.GetGuild context.GuildId
+
+            let prune now =
+                Prune.command repository (settings ()) context.Client (server ()) now
+
+            let cleanup () : Task =
+                task {
+                    // Gives the member list time to load, so members who left can be told apart.
+                    do! Task.Delay(TimeSpan.FromMinutes 10.0)
+
+                    while true do
+                        queue "Daily course cleanup" (fun () ->
+                            Prune.daily context repository (settings ()) (server ()))
+
+                        do! Task.Delay(TimeSpan.FromDays 1.0)
+                }
+
+            cleanup () |> ignore
+
             return
                 [
-                    SlashCommand.command repository guild settings queue
+                    SlashCommand.command repository guild settings queue prune
                     MemberCommand.command repository guild settings queue
                 ]
         }
