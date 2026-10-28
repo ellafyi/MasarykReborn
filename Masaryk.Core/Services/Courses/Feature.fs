@@ -20,6 +20,7 @@ let start: Feature =
             )
 
             context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(SlashCommand.turnPage repository))
+            Refresh.run context |> ignore
 
             let guild () =
                 context.Client.GetGuild context.GuildId :> IGuild

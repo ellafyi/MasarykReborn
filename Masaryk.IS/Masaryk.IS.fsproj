@@ -6,6 +6,7 @@
 
     <ItemGroup>
         <Compile Include="Faculties.fs" />
+        <Compile Include="Terms.fs" />
         <Compile Include="Text.fs" />
         <Compile Include="Export.fs" />
         <Compile Include="Prezentator.fs" />

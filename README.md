@@ -87,7 +87,7 @@ Rules every feature follows:
 - Commit messages are `type: summary`, e.g. `feat: add /menu` or `fix: keep the reply chain under the embed limit`.
 
 ## Deployment
-Production runs as a Portainer stack (but should just work through compose) next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables, plus `IS_UCO` and `IS_PASSWORD` for `fetch-courses`.
+Production runs as a Portainer stack (but should just work through compose) next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables, plus `IS_UCO` and `IS_PASSWORD`, which turn on the daily course catalog refresh from IS.
 
 ## Planned Features
 
