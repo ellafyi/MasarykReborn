@@ -2,10 +2,11 @@
 module Masaryk.Core.Services.Courses.Channels
 
 open System
+open Masaryk.IS
 open Masaryk.Postgres
 
-/// The old bot's naming: look-alike characters keep what Discord would strip,
-/// and an en dash inside the name keeps the first hyphen as the end of the code.
+/// Look-alike characters keep what Discord would strip, and an en dash inside the name keeps
+/// the first hyphen as the end of the code.
 let sanitize (name: string) : string =
     let words =
         name.ToLowerInvariant().Replace("-", "–").Split((null: char array), StringSplitOptions.RemoveEmptyEntries)
@@ -42,26 +43,10 @@ let code (home: string option) (channel: string) : (string * string) option =
     | [| faculty; code |] when faculty <> "" && code <> "" -> Some(faculty, code)
     | _ -> None
 
-/// IS addresses use English faculty abbreviations.
-let private faculties =
-    dict
-        [
-            "FI", "fi"
-            "FF", "phil"
-            "PřF", "sci"
-            "LF", "med"
-            "PdF", "ped"
-            "FSS", "fss"
-            "PrF", "law"
-            "ESF", "econ"
-            "FSpS", "fsps"
-            "FaF", "pharm"
-        ]
-
 let topic (course: Course) : string =
-    match faculties.TryGetValue course.Faculty with
-    | true, slug -> $"{course.Name} · https://is.muni.cz/predmet/{slug}/{course.Code}"
-    | _ -> course.Name
+    match Faculties.coursePage course.Faculty course.Code with
+    | Some page -> $"{course.Name} · {page}"
+    | None -> course.Name
 
 /// Courses sit in a category named by the code's leading letters, or by faculty outside the home faculty.
 let category (home: string option) (course: Course) : string =

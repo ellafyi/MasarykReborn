@@ -14,6 +14,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.Postgres.Migrator",
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.Configuration", "Masaryk.Configuration\Masaryk.Configuration.fsproj", "{224322EA-85A0-45F8-897D-14DA515412E5}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Masaryk.IS", "Masaryk.IS\Masaryk.IS.fsproj", "{7544EDE7-C70F-4039-AF3E-0314D071EE20}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,6 +74,18 @@ Global
 		{224322EA-85A0-45F8-897D-14DA515412E5}.Release|x64.Build.0 = Release|Any CPU
 		{224322EA-85A0-45F8-897D-14DA515412E5}.Release|x86.ActiveCfg = Release|Any CPU
 		{224322EA-85A0-45F8-897D-14DA515412E5}.Release|x86.Build.0 = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|x64.Build.0 = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Debug|x86.Build.0 = Debug|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|x64.ActiveCfg = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|x64.Build.0 = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|x86.ActiveCfg = Release|Any CPU
+		{7544EDE7-C70F-4039-AF3E-0314D071EE20}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

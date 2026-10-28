@@ -1,10 +1,8 @@
-/// Read the IS MU prezentátor export: one HTML table, one row per course and term.
-module Masaryk.Core.Services.Courses.Export
+/// Reads a Prezentátor export, a table with one row per course and term.
+module Masaryk.IS.Export
 
 open System
 open System.Text.RegularExpressions
-open Masaryk.Core.Services.Shared
-open Masaryk.Postgres
 
 let private tag (name: string) =
     Regex($"<{name}>(.*?)</{name}>", RegexOptions.Singleline ||| RegexOptions.IgnoreCase)
@@ -13,7 +11,7 @@ let private rows, headers, cells = tag "TR", tag "TH", tag "TD"
 
 let private values (pattern: Regex) (row: string) =
     pattern.Matches(row)
-    |> Seq.map (fun m -> Html.plain m.Groups[1].Value)
+    |> Seq.map (fun m -> Text.plain m.Groups[1].Value)
     |> Seq.toArray
 
 /// Exchange-programme (XX_) and placeholder (ZZ_) codes aren't real courses.

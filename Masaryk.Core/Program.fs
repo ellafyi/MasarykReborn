@@ -141,6 +141,8 @@ let main (args: string array) : int =
         match args with
         | [| "import-history" |] -> Leaderboard.Import.run database guildId (token ())
         | [| "import-courses"; path |] -> Courses.Import.run database path
+        | args when args.Length > 1 && args[0] = "fetch-courses" ->
+            Courses.Import.fetch database (List.ofArray args[1..])
         | _ -> run database
 
     work.GetAwaiter().GetResult()

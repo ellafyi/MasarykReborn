@@ -3,6 +3,7 @@ WORKDIR /src
 COPY ["Masaryk.Core/Masaryk.Core.fsproj", "Masaryk.Core/"]
 COPY ["Masaryk.Postgres/Masaryk.Postgres.fsproj", "Masaryk.Postgres/"]
 COPY ["Masaryk.Configuration/Masaryk.Configuration.fsproj", "Masaryk.Configuration/"]
+COPY ["Masaryk.IS/Masaryk.IS.fsproj", "Masaryk.IS/"]
 RUN dotnet restore "Masaryk.Core/Masaryk.Core.fsproj"
 COPY . .
 RUN dotnet publish "Masaryk.Core/Masaryk.Core.fsproj" -c Release -o /app/publish /p:UseAppHost=false

@@ -27,6 +27,7 @@ The pre-commit hook formats staged F# files with Fantomas and builds the solutio
 | Project | What it holds |
 |---|---|
 | `Masaryk.Core` | The bot. `Program.fs` connects to Discord, starts every feature and routes slash commands. |
+| `Masaryk.IS` | Everything that talks to IS MU: Prezentátor requests, parsing its exports, the faculty list and course page addresses. It depends on nothing else. |
 | `Masaryk.Postgres` | Database access: one repository per feature, the shared helpers in `Sql.fs`, and the SQL migrations in `Migrations/`. |
 | `Masaryk.Postgres.Migrator` | Applies the migrations with DbUp. Compose runs it before the bot starts. |
 | `Masaryk.Configuration` | The per-server settings document behind `/config export` and `/config import`. It depends on nothing else. |
@@ -86,7 +87,7 @@ Rules every feature follows:
 - Commit messages are `type: summary`, e.g. `feat: add /menu` or `fix: keep the reply chain under the embed limit`.
 
 ## Deployment
-Production runs as a Portainer stack (but should just work through compose) next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables.
+Production runs as a Portainer stack (but should just work through compose) next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables, plus `IS_UCO` and `IS_PASSWORD` for `fetch-courses`.
 
 ## Planned Features
 

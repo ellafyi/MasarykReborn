@@ -8,20 +8,21 @@ Discord bot for one server (`GUILD_ID`), written in F# on .NET 10 with Discord.N
 dotnet tool restore                          # pins Fantomas 8.0.7
 git config --local core.hooksPath .githooks  # once per clone
 dotnet build Masaryk.sln
-dotnet fantomas Masaryk.Core Masaryk.Configuration Masaryk.Postgres Masaryk.Postgres.Migrator
+dotnet fantomas Masaryk.Core Masaryk.Configuration Masaryk.IS Masaryk.Postgres Masaryk.Postgres.Migrator
 docker compose up --build -d                 # dev stack: bot, migrator, Postgres (published on 15432)
 docker compose logs -f masaryk.core
 ```
 
 - The pre-commit hook formats staged F# files with Fantomas, then builds the whole solution. A commit fails if either step fails or if the formatter changed files.
 - There is no test project. Verify by building and running the bot against a test guild.
-- One-off imports run in the bot image: `docker compose run --rm masaryk.core import-history` and `... import-courses <html>`.
+- One-off imports run in the bot image: `docker compose run --rm masaryk.core import-history`, `... import-courses <html>` and `... fetch-courses <term>...` (e.g. `"podzim 2026" "jaro 2027"`, oldest first).
 
 ## Layout
 
 | Project | Role |
 |---|---|
 | `Masaryk.Core` | Bot host. `Program.fs` wires features; each feature lives in `Services/<Name>/` |
+| `Masaryk.IS` | Everything that talks to IS MU: Prezentátor requests, export parsing, faculties and course pages; depends on nothing else |
 | `Masaryk.Postgres` | Repositories (Npgsql, hand-written SQL in `Sql.fs` helpers) and `Migrations/*.sql` |
 | `Masaryk.Postgres.Migrator` | Runs the migrations with DbUp; Compose runs it before the bot starts |
 | `Masaryk.Configuration` | Per-server settings document (`/config export` and `/config import`); depends on nothing else |
@@ -34,7 +35,7 @@ docker compose logs -f masaryk.core
 - Slash commands are registered on the one guild only; handlers for events must ignore other guilds.
 - Gateway handlers don't do slow work: queue it through `Services/Shared/Worker.fs`.
 - Migrations are numbered `NNN_name.sql`, run in order, one transaction each. Never change the SQL of an applied one; add a new one, and add it as an `EmbeddedResource` in `Masaryk.Postgres.fsproj`. Scripts are listed by hand, so an unlisted file is silently never run. Editing only comments in an applied one is safe: DbUp tracks scripts by name, not content.
-- Settings come from environment variables: `BOT_TOKEN`, `GUILD_ID`, `MASARYK_DATABASE_CONNECTION_STRING`, optional `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`. Compose builds the connection string from the `POSTGRES_*` variables.
+- Settings come from environment variables: `BOT_TOKEN`, `GUILD_ID`, `MASARYK_DATABASE_CONNECTION_STRING`, optional `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`, `IS_UCO`, `IS_PASSWORD`. Compose builds the connection string from the `POSTGRES_*` variables.
 - Commit messages follow `type: summary` (`feat:`, `fix:`, `refactor:`, `build:`).
 
 ## Chat feature

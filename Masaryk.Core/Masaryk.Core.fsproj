@@ -35,7 +35,6 @@
         <Compile Include="Services\Leaderboard\Import.fs" />
         <Compile Include="Services\Leaderboard\Feature.fs" />
         <Compile Include="Services\Fun\Feature.fs" />
-        <Compile Include="Services\Courses\Export.fs" />
         <Compile Include="Services\Courses\Import.fs" />
         <Compile Include="Services\Courses\Channels.fs" />
         <Compile Include="Services\Courses\Guild.fs" />
@@ -67,6 +66,7 @@
     <ItemGroup>
         <PackageReference Include="Discord.Net" Version="3.20.1" />
         <ProjectReference Include="..\Masaryk.Configuration\Masaryk.Configuration.fsproj" />
+        <ProjectReference Include="..\Masaryk.IS\Masaryk.IS.fsproj" />
         <ProjectReference Include="..\Masaryk.Postgres\Masaryk.Postgres.fsproj" />
     </ItemGroup>
 

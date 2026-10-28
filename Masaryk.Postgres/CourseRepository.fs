@@ -3,14 +3,7 @@ namespace Masaryk.Postgres
 open System.Data.Common
 open System.Threading.Tasks
 open Npgsql
-
-/// One row of the IS course export.
-type CatalogCourse =
-    {
-        Faculty: string
-        Code: string
-        Name: string
-    }
+open Masaryk.IS
 
 type Course =
     {

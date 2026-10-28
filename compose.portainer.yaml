@@ -19,6 +19,8 @@ services:
       LLM_API_URL: "${LLM_API_URL-http://masaryk:8000/v1}"
       LLM_API_KEY: "${LLM_API_KEY:-}"
       LLM_MODEL: "${LLM_MODEL:-masaryk}"
+      IS_UCO: "${IS_UCO:-}"
+      IS_PASSWORD: "${IS_PASSWORD:-}"
       MASARYK_DATABASE_CONNECTION_STRING: *database-connection
     depends_on:
       masaryk.migrator:
