@@ -34,6 +34,7 @@
         <EmbeddedResource Include="Migrations/011_configuration.sql" />
         <EmbeddedResource Include="Migrations/012_course_names.sql" />
         <EmbeddedResource Include="Migrations/013_lockout.sql" />
+        <EmbeddedResource Include="Migrations/014_lockout_overwrites.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

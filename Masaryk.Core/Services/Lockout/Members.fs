@@ -77,3 +77,49 @@ let restore (guild: SocketGuild) (user: IGuildUser) (locked: LockedMember) : Tas
 
     let current = held guild user |> List.filter ((<>) locked.LockRole)
     setRoles user (List.distinct (current @ back))
+
+/// Whether this is a member's own overwrite that lets them see the channel. Discord applies those
+/// after role overwrites, so the lockout role's deny doesn't hide such a channel.
+let isPersonalView (overwrite: Overwrite) : bool =
+    overwrite.TargetType = PermissionTarget.User
+    && overwrite.Permissions.ViewChannel = PermValue.Allow
+
+/// Save the member's own View Channel overwrites, then remove them. Saving first means a failed
+/// removal loses nothing.
+let takeOverwrites (repository: LockoutRepository) (guild: SocketGuild) (user: IGuildUser) : Task =
+    task {
+        let found =
+            [
+                for channel in Hiding.channels guild do
+                    for overwrite in channel.PermissionOverwrites do
+                        if overwrite.TargetId = user.Id && isPersonalView overwrite then
+                            channel,
+                            {
+                                ChannelId = channel.Id
+                                Allow = overwrite.Permissions.AllowValue
+                                Deny = overwrite.Permissions.DenyValue
+                            }
+            ]
+
+        if not found.IsEmpty then
+            do! repository.SaveOverwrites(user.Id, List.map snd found)
+
+            for channel, _ in found do
+                do! channel.RemovePermissionOverwriteAsync(user)
+    }
+
+/// Put a saved overwrite back. A channel that no longer exists is logged and counts as done.
+let giveBack (guild: SocketGuild) (user: IGuildUser) (saved: SavedOverwrite) : Task =
+    task {
+        let gone () =
+            eprintfn
+                $"Touch grass: channel {saved.ChannelId} no longer exists, {user.Id} doesn't get its overwrite back."
+
+        match guild.GetChannel saved.ChannelId with
+        | null -> gone ()
+        | channel ->
+            try
+                do! channel.AddPermissionOverwriteAsync(user, OverwritePermissions(saved.Allow, saved.Deny))
+            with :? Net.HttpException as error when error.DiscordCode = Nullable DiscordErrorCode.UnknownChannel ->
+                gone ()
+    }

@@ -110,6 +110,17 @@ let private individualLines (guild: SocketGuild) (settings: LockoutSettings) : s
                 $"{own.Length} channels have permissions of their own or no category, so I set the role on each one instead of syncing it with its category (syncing would erase those permissions): {some (own |> List.map mention)}"
     ]
 
+let private personalLines (guild: SocketGuild) : string list =
+    let personal =
+        Hiding.channels guild
+        |> List.filter (fun c -> c.PermissionOverwrites |> Seq.exists Members.isPersonalView)
+
+    [
+        if not personal.IsEmpty then
+            note
+                $"{personal.Length} channels let single members see them through their own overwrites. A lockout takes the member's own away and gives them back at the end."
+    ]
+
 let private hierarchyLines (guild: SocketGuild) : string list =
     let bot = Members.botRank guild
 
@@ -158,6 +169,7 @@ let report
                             "This looks right, but my check (every 30 seconds) hasn't confirmed it yet. Run this again in a minute."
                 ]
                 @ individualLines guild settings
+                @ personalLines guild
                 @ hierarchyLines guild
                 @ [
                     match Members.obstacle guild settings.RoleId admin with

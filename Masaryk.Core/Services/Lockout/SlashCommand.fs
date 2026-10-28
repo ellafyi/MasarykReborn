@@ -144,6 +144,7 @@ let private lockOut
                     | Some locked ->
                         try
                             do! Members.lock guild settings.RoleId target
+                            do! Members.takeOverwrites repository guild target
                             return lockedText locked
                         with error ->
                             return! failed context repository locked error

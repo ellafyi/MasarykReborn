@@ -15,6 +15,14 @@ type LockedMember =
         Until: DateTimeOffset
     }
 
+/// A member's own overwrite on one channel, saved while they are locked out.
+type SavedOverwrite =
+    {
+        ChannelId: uint64
+        Allow: uint64
+        Deny: uint64
+    }
+
 /// Members locked out with /touch-grass. Times come from the database's clock.
 type LockoutRepository(dataSource: NpgsqlDataSource) =
     static let columns = "user_id, lock_role_id, role_ids, locked_at, locked_until"
@@ -66,3 +74,36 @@ type LockoutRepository(dataSource: NpgsqlDataSource) =
 
     member _.Remove(userId: uint64) : Task<unit> =
         Sql.execute (dataSource.CreateCommand "DELETE FROM lockout WHERE user_id = $1") [ box (decimal userId) ]
+
+    /// An overwrite already saved for a channel is kept, since it is the one from before the lockout.
+    member _.SaveOverwrites(userId: uint64, overwrites: SavedOverwrite list) : Task<unit> =
+        Sql.execute
+            (dataSource.CreateCommand
+                """
+                INSERT INTO lockout_overwrite (user_id, channel_id, allow_value, deny_value)
+                SELECT $1::numeric, * FROM unnest($2::numeric[], $3::numeric[], $4::numeric[])
+                ON CONFLICT (user_id, channel_id) DO NOTHING
+                """)
+            [
+                box (decimal userId)
+                Sql.ids (overwrites |> List.map _.ChannelId)
+                Sql.ids (overwrites |> List.map _.Allow)
+                Sql.ids (overwrites |> List.map _.Deny)
+            ]
+
+    member _.Overwrites(userId: uint64) : Task<SavedOverwrite list> =
+        Sql.query
+            (dataSource.CreateCommand
+                "SELECT channel_id, allow_value, deny_value FROM lockout_overwrite WHERE user_id = $1")
+            [ box (decimal userId) ]
+            (fun r ->
+                {
+                    ChannelId = uint64 (r.GetDecimal 0)
+                    Allow = uint64 (r.GetDecimal 1)
+                    Deny = uint64 (r.GetDecimal 2)
+                })
+
+    member _.RemoveOverwrite(userId: uint64, channelId: uint64) : Task<unit> =
+        Sql.execute
+            (dataSource.CreateCommand "DELETE FROM lockout_overwrite WHERE user_id = $1 AND channel_id = $2")
+            [ box (decimal userId); box (decimal channelId) ]

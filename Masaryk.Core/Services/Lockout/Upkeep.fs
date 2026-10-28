@@ -53,7 +53,8 @@ let private hide
                     $"Touch grass: can't hide {failures.Length} channels from the lockout role, so /touch-grass is off until I can ({sample})."
     }
 
-/// Give back the roles of everyone whose time is up. Members who left just lose their row.
+/// Give back the roles and own overwrites of everyone whose time is up. Members who left just lose
+/// their row. An error keeps the row, and what's left is retried on the next pass.
 let private restoreDue (context: Context) (repository: LockoutRepository) (guild: SocketGuild) : Task =
     task {
         let! due = repository.Due()
@@ -64,14 +65,20 @@ let private restoreDue (context: Context) (repository: LockoutRepository) (guild
 
                 if not (isNull user) then
                     do! Members.restore guild user locked
+                    let! saved = repository.Overwrites locked.UserId
+
+                    for overwrite in saved do
+                        do! Members.giveBack guild user overwrite
+                        do! repository.RemoveOverwrite(locked.UserId, overwrite.ChannelId)
 
                 do! repository.Remove locked.UserId
             with error ->
                 eprintfn $"Touch grass: couldn't restore {locked.UserId}, will retry: {error.Message}"
     }
 
-/// Lock out again anyone who rejoined during a lockout, which cleared their roles.
-let private relock (context: Context) (repository: LockoutRepository) (guild: SocketGuild) : Task =
+/// Locks out again anyone who rejoined, and takes away own overwrites that a failed removal left
+/// behind or an admin added since.
+let private enforce (context: Context) (repository: LockoutRepository) (guild: SocketGuild) : Task =
     task {
         let! active = repository.Active()
 
@@ -79,9 +86,12 @@ let private relock (context: Context) (repository: LockoutRepository) (guild: So
             try
                 let! user = context.Client.Rest.GetGuildUserAsync(context.GuildId, locked.UserId)
 
-                if not (isNull user) && Members.rejoined user locked then
-                    do! Members.lock guild locked.LockRole user
-                    printfn $"Touch grass: {locked.UserId} rejoined during a lockout and is locked out again."
+                if not (isNull user) then
+                    if Members.rejoined user locked then
+                        do! Members.lock guild locked.LockRole user
+                        printfn $"Touch grass: {locked.UserId} rejoined during a lockout and is locked out again."
+
+                    do! Members.takeOverwrites repository guild user
             with error ->
                 eprintfn $"Touch grass: couldn't re-check {locked.UserId}: {error.Message}"
     }
@@ -126,7 +136,7 @@ let run (context: Context) (repository: LockoutRepository) (hidden: LockoutSetti
 
                 if context.Client.ConnectionState = ConnectionState.Connected && not (isNull guild) then
                     do! restoreDue context repository guild
-                    do! relock context repository guild
+                    do! enforce context repository guild
                     do! hide context hidden last guild
                     do! announce context hidden announced lastNotice guild
             with error ->
