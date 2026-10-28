@@ -11,7 +11,7 @@ All parts of the bot are launched via a Docker Compose stack. Compose provides a
 
 ### Getting started
 
-1. Create a Discord application with a bot user, enable the **Message Content Intent**, and invite it to a test server.
+1. Create a Discord application with a bot user, enable the **Message Content Intent** and the **Server Members Intent**, and invite it to a test server.
 2. Copy `.env.example` to `.env` and fill in `BOT_TOKEN`, `GUILD_ID` (the test server's ID) and `POSTGRES_PASSWORD`. Leave `LLM_API_URL` empty unless you run the language model.
 3. Set up the tools and the Git hook once per clone:
    ```shell

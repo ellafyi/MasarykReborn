@@ -13,10 +13,13 @@ let client =
         DiscordSocketConfig(
             GatewayIntents =
                 (GatewayIntents.Guilds
+                 ||| GatewayIntents.GuildMembers
                  ||| GatewayIntents.GuildMessages
                  ||| GatewayIntents.GuildMessageReactions
                  ||| GatewayIntents.DirectMessageReactions
-                 ||| GatewayIntents.MessageContent)
+                 ||| GatewayIntents.MessageContent),
+            // The course cleanup needs every member to tell who left while the bot was offline.
+            AlwaysDownloadUsers = true
         )
     )
 

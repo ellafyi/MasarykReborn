@@ -35,6 +35,18 @@ let start: Feature =
                 Func<SocketMessageComponent, Task>(MemberCommand.onButton repository guild settings queue)
             )
 
+            let left (server: SocketGuild) (user: SocketUser) : Task =
+                if server.Id = context.GuildId then
+                    queue $"Course cleanup for {user.Id}, who left" (fun () ->
+                        task {
+                            let! _ = Membership.leaveAll repository (settings ()) server user
+                            ()
+                        })
+
+                Task.CompletedTask
+
+            context.Client.add_UserLeft (Func<SocketGuild, SocketUser, Task>(left))
+
             Refresh.run context |> ignore
 
             return

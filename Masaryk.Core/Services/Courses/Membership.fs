@@ -71,19 +71,21 @@ let private grant
                     return false
     }
 
+/// Also works for someone who left the server, whose roles went with them.
 let private revoke
     (settings: CourseSettings)
     (guild: IGuild)
     (channel: IGuildChannel)
     (course: Course)
-    (user: IGuildUser)
+    (user: IUser)
     : Task =
     task {
         if (channel.GetPermissionOverwrite user).HasValue then
             do! channel.RemovePermissionOverwriteAsync user
 
-        match courseRole settings guild course with
-        | Some role when Seq.contains role.Id user.RoleIds -> do! user.RemoveRoleAsync role
+        match user, courseRole settings guild course with
+        | :? IGuildUser as member', Some role when Seq.contains role.Id member'.RoleIds ->
+            do! member'.RemoveRoleAsync role
         | _ -> ()
     }
 
@@ -300,7 +302,7 @@ let leave
     (settings: CourseSettings)
     (guild: IGuild)
     (course: Course)
-    (user: IGuildUser)
+    (user: IUser)
     : Task<string> =
     task {
         let! wasMember = repository.RemoveMember(course.Id, user.Id)
@@ -340,12 +342,7 @@ let toggle
             return! join repository settings guild course user
     }
 
-let leaveAll
-    (repository: CourseRepository)
-    (settings: CourseSettings)
-    (guild: IGuild)
-    (user: IGuildUser)
-    : Task<string> =
+let leaveAll (repository: CourseRepository) (settings: CourseSettings) (guild: IGuild) (user: IUser) : Task<string> =
     task {
         let! courses = repository.CoursesOf user.Id
 
