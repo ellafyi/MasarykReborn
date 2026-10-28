@@ -56,6 +56,15 @@ let private missingChannels (guild: SocketGuild) (configuration: Configuration) 
             if isNull (guild.GetTextChannel lockout.ChannelId) then
                 $"lockout channel: there's no text channel {lockout.ChannelId} on this server"
         | None -> ()
+
+        match configuration.Courses.InterestChannel with
+        | Some id when isNull (guild.GetTextChannel id) ->
+            $"courses interestChannel: there's no text channel {id} on this server"
+        | _ -> ()
+
+        match configuration.Courses.ShowAllRole with
+        | Some id when isNull (guild.GetRole id) -> $"courses showAllRole: there's no role {id} on this server"
+        | _ -> ()
     ]
 
 let private http = new HttpClient()

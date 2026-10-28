@@ -218,13 +218,34 @@ let read (json: string) : Result<int64 option * Configuration, string list> =
                                 value
                         | _ -> Defaults.configuration.Lockout
 
+                    let courses =
+                        let fallback = Defaults.configuration.Courses
+
+                        match (snd o).TryGetProperty "courses" with
+                        | true, value ->
+                            record
+                                [ "homeFaculty"; "interestChannel"; "minimumMembers"; "showAllRole" ]
+                                (fun s ->
+                                    {
+                                        HomeFaculty = optional s "homeFaculty" fallback.HomeFaculty text
+                                        InterestChannel =
+                                            optional s "interestChannel" fallback.InterestChannel discordId
+                                        MinimumMembers =
+                                            optional s "minimumMembers" None positive
+                                            |> Option.defaultValue fallback.MinimumMembers
+                                        ShowAllRole = optional s "showAllRole" fallback.ShowAllRole discordId
+                                    })
+                                "courses"
+                                value
+                        | _ -> fallback
+
                     version,
                     {
                         LogChannel = optional o "logChannel" Defaults.configuration.LogChannel discordId
                         Boards =
                             section o "starboard" "boards" (Some Defaults.configuration.Boards) (list board)
                             |> Option.defaultValue []
-                        HomeFaculty = section o "courses" "homeFaculty" Defaults.configuration.HomeFaculty text
+                        Courses = courses
                         Restaurants =
                             section o "menu" "restaurants" (Some Defaults.configuration.Restaurants) (list restaurant)
                             |> Option.defaultValue []
@@ -295,9 +316,17 @@ let export (version: int64) (configuration: Configuration) : string =
         |> Option.defaultValue "\"<channel ID>\""
 
     let homeFaculty =
-        configuration.HomeFaculty
+        configuration.Courses.HomeFaculty
         |> Option.map quote
         |> Option.defaultValue "\"<faculty code>\""
+
+    let discordId placeholder (value: uint64 option) =
+        value |> Option.map (fun id -> $"\"{id}\"") |> Option.defaultValue placeholder
+
+    let interestChannel =
+        discordId "\"<channel ID>\"" configuration.Courses.InterestChannel
+
+    let showAllRole = discordId "\"<role ID>\"" configuration.Courses.ShowAllRole
 
     let boards = configuration.Boards |> List.map boardJson |> String.concat ","
 
@@ -336,7 +365,14 @@ let export (version: int64) (configuration: Configuration) : string =
 
   "courses": {
     // Courses of this faculty get channel names without a faculty prefix.
-    "homeFaculty": {{homeFaculty}}
+    "homeFaculty": {{homeFaculty}},
+    // `/course join` on a course without a channel posts a request here, read-only for members.
+    // Members click to say they're interested, and the channel opens at `minimumMembers`.
+    // Leave unset to let members join only courses that already have a channel.
+    "interestChannel": {{interestChannel}},
+    "minimumMembers": {{configuration.Courses.MinimumMembers}},
+    // Optional: a role that sees every course channel, e.g. for moderators.
+    "showAllRole": {{showAllRole}}
   },
 
   "lockout": {

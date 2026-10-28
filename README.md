@@ -102,7 +102,7 @@ From the old bot:
 
 - [x] Leaderboards for users and channels
 - [ ] Message logging and backups
-- [ ] Course channels: search MUNI courses, join/leave them, get access to their channels (catalog import and channel creation done)
+- [x] Course channels: search MUNI courses, join/leave them, get access to their channels. The catalog comes from IS daily. `/course join` gives access to a course's channel, or records interest in an interest channel until enough members want it, then creates it and DMs them. `/courses` (admins) lists, links, creates and recovers course channels.
 - [ ] Verification, welcome DMs and the rules channel
 - [ ] Role menus (pick roles and channels by reacting)
 - [ ] Auto-created threads in some channels

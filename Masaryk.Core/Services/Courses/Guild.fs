@@ -4,6 +4,8 @@ module Masaryk.Core.Services.Courses.Guild
 open System.Threading.Tasks
 open System
 open Discord
+open Discord.Net
+open Masaryk.Configuration
 open Masaryk.Postgres
 
 /// Link every unlinked channel named after an unlinked catalog course.
@@ -77,11 +79,15 @@ let private categoryFor
     }
 
 type Creation =
-    | Created of uint64
+    /// The new channel itself, since the cache only learns about it when Discord's event arrives.
+    | Created of IGuildChannel
     | Exists of uint64
+    /// The server has Discord's maximum of 500 channels, categories included.
+    | Full
 
-/// Create the course's channel in its category, opening a numbered category when it is full.
-let create (repository: CourseRepository) (home: string option) (guild: IGuild) (course: Course) : Task<Creation> =
+/// Create the course's private channel in its category, opening a numbered category when it is full.
+/// Only the bot and the show-all role see it until members are let in.
+let create (repository: CourseRepository) (settings: CourseSettings) (guild: IGuild) (course: Course) : Task<Creation> =
     task {
         let! linked = repository.ChannelOf course.Id
 
@@ -92,18 +98,38 @@ let create (repository: CourseRepository) (home: string option) (guild: IGuild) 
 
         match existing with
         | null ->
-            let! category = categoryFor home guild course (Nullable())
+            try
+                let! category = categoryFor settings.HomeFaculty guild course (Nullable())
+                let! bot = guild.GetCurrentUserAsync()
+                let view = OverwritePermissions.InheritAll.Modify(viewChannel = PermValue.Allow)
 
-            let! channel =
-                guild.CreateTextChannelAsync(
-                    Channels.name home course,
-                    fun properties ->
-                        properties.CategoryId <- Optional(Nullable category.Id)
-                        properties.Topic <- Channels.topic course
-                )
+                let overwrites =
+                    [
+                        Overwrite(
+                            guild.EveryoneRole.Id,
+                            PermissionTarget.Role,
+                            OverwritePermissions.InheritAll.Modify(viewChannel = PermValue.Deny)
+                        )
+                        Overwrite(bot.Id, PermissionTarget.User, view)
+                        match settings.ShowAllRole with
+                        | Some role -> Overwrite(role, PermissionTarget.Role, view)
+                        | None -> ()
+                    ]
 
-            do! repository.Link(course.Id, channel.Id)
-            return Created channel.Id
+                let! channel =
+                    guild.CreateTextChannelAsync(
+                        Channels.name settings.HomeFaculty course,
+                        fun properties ->
+                            properties.CategoryId <- Optional(Nullable category.Id)
+                            properties.Topic <- Channels.topic course
+                            properties.PermissionOverwrites <- Optional(Seq.ofList overwrites)
+                    )
+
+                do! repository.Link(course.Id, channel.Id)
+                return Created channel
+            with :? HttpException as error when
+                error.DiscordCode = Nullable DiscordErrorCode.MaximumGuildChannelsReached ->
+                return Full
         | channel -> return Exists channel.Id
     }
 

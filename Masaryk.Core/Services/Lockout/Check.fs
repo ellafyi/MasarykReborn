@@ -113,7 +113,9 @@ let private individualLines (guild: SocketGuild) (settings: LockoutSettings) : s
 let private personalLines (guild: SocketGuild) : string list =
     let personal =
         Hiding.channels guild
-        |> List.filter (fun c -> c.PermissionOverwrites |> Seq.exists Members.isPersonalView)
+        |> List.filter (fun c ->
+            c.PermissionOverwrites
+            |> Seq.exists (fun o -> o.TargetId <> guild.CurrentUser.Id && Members.isPersonalView o))
 
     [
         if not personal.IsEmpty then

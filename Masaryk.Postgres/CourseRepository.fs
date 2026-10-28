@@ -134,3 +134,84 @@ type CourseRepository(dataSource: NpgsqlDataSource) =
 
             return removed > 0
         }
+
+    member _.FindById(courseId: int64) : Task<Course option> =
+        Sql.queryOne
+            (dataSource.CreateCommand "SELECT id, faculty_code, code, name FROM course WHERE id = $1")
+            [ box courseId ]
+            course
+
+    /// Returns whether they weren't a member yet.
+    member _.AddMember(courseId: int64, userId: uint64) : Task<bool> =
+        task {
+            let! added =
+                Sql.affected
+                    (dataSource.CreateCommand
+                        "INSERT INTO course_member (course_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                    [ box courseId; box (decimal userId) ]
+
+            return added > 0
+        }
+
+    /// Returns how many were new.
+    member _.AddMembers(courseId: int64, userIds: uint64 list) : Task<int> =
+        Sql.affected
+            (dataSource.CreateCommand
+                """
+                INSERT INTO course_member (course_id, user_id)
+                SELECT $1, user_id FROM unnest($2::numeric[]) AS user_id
+                ON CONFLICT DO NOTHING
+                """)
+            [ box courseId; Sql.ids userIds ]
+
+    /// Returns whether they were a member.
+    member _.RemoveMember(courseId: int64, userId: uint64) : Task<bool> =
+        task {
+            let! removed =
+                Sql.affected
+                    (dataSource.CreateCommand "DELETE FROM course_member WHERE course_id = $1 AND user_id = $2")
+                    [ box courseId; box (decimal userId) ]
+
+            return removed > 0
+        }
+
+    member _.Members(courseId: int64) : Task<uint64 list> =
+        Sql.query
+            (dataSource.CreateCommand "SELECT user_id FROM course_member WHERE course_id = $1 ORDER BY joined_at")
+            [ box courseId ]
+            (fun r -> uint64 (r.GetDecimal 0))
+
+    /// The member's courses with their linked channel and member count.
+    member _.CoursesOf(userId: uint64) : Task<(Course * uint64 option * int64) list> =
+        Sql.query
+            (dataSource.CreateCommand
+                """
+                SELECT c.id, c.faculty_code, c.code, c.name, l.channel_id,
+                       (SELECT count(*) FROM course_member o WHERE o.course_id = c.id)
+                FROM course_member m
+                JOIN course c ON c.id = m.course_id
+                LEFT JOIN course_channel l ON l.course_id = c.id
+                WHERE m.user_id = $1
+                ORDER BY c.faculty_code, c.code
+                """)
+            [ box (decimal userId) ]
+            (fun r -> course r, Sql.readOptional r 4 (r.GetDecimal >> uint64), r.GetInt64 5)
+
+    /// The channel and message of the course's request.
+    member _.Request(courseId: int64) : Task<(uint64 * uint64) option> =
+        Sql.queryOne
+            (dataSource.CreateCommand "SELECT channel_id, message_id FROM course_request WHERE course_id = $1")
+            [ box courseId ]
+            (fun r -> uint64 (r.GetDecimal 0), uint64 (r.GetDecimal 1))
+
+    member _.SaveRequest(courseId: int64, channelId: uint64, messageId: uint64) : Task<unit> =
+        Sql.execute
+            (dataSource.CreateCommand
+                """
+                INSERT INTO course_request (course_id, channel_id, message_id) VALUES ($1, $2, $3)
+                ON CONFLICT (course_id) DO UPDATE SET channel_id = EXCLUDED.channel_id, message_id = EXCLUDED.message_id
+                """)
+            [ box courseId; box (decimal channelId); box (decimal messageId) ]
+
+    member _.RemoveRequest(courseId: int64) : Task<unit> =
+        Sql.execute (dataSource.CreateCommand "DELETE FROM course_request WHERE course_id = $1") [ box courseId ]

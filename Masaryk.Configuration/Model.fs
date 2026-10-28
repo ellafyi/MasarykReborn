@@ -39,14 +39,26 @@ type Restaurant =
 /// What /touch-grass uses: a locked-out member keeps only `RoleId` and sees only `ChannelId`.
 type LockoutSettings = { RoleId: uint64; ChannelId: uint64 }
 
+type CourseSettings =
+    {
+        /// Courses of this faculty get channel names without a faculty prefix.
+        HomeFaculty: string option
+        /// Where `/course join` posts requests for courses without a channel. Unset means members
+        /// can only join courses that have one.
+        InterestChannel: uint64 option
+        /// How many interested members it takes to open a course's channel.
+        MinimumMembers: int
+        /// A role that sees every course channel.
+        ShowAllRole: uint64 option
+    }
+
 /// Everything a server's admins can change about the bot.
 type Configuration =
     {
         /// Where the bot reports progress and problems to admins.
         LogChannel: uint64 option
         Boards: Board list
-        /// Courses of this faculty get channel names without a faculty prefix.
-        HomeFaculty: string option
+        Courses: CourseSettings
         Restaurants: Restaurant list
         /// Unset turns /touch-grass off.
         Lockout: LockoutSettings option

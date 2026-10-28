@@ -44,7 +44,13 @@ let configuration: Configuration =
     {
         LogChannel = None
         Boards = []
-        HomeFaculty = Some "FI"
+        Courses =
+            {
+                HomeFaculty = Some "FI"
+                InterestChannel = None
+                MinimumMembers = 10
+                ShowAllRole = None
+            }
         Restaurants = restaurants
         Lockout = None
     }

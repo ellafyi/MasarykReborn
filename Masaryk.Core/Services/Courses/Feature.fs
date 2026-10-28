@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Discord
 open Discord.WebSocket
 open Masaryk.Core
+open Masaryk.Core.Services.Shared
 open Masaryk.Postgres
 
 let start: Feature =
@@ -12,18 +13,33 @@ let start: Feature =
         task {
             let repository = CourseRepository(context.Database)
 
-            let home () =
-                context.Configuration.Current.HomeFaculty
-
-            context.Client.add_AutocompleteExecuted (
-                Func<SocketAutocompleteInteraction, Task>(SlashCommand.autocomplete repository home)
-            )
-
-            context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(SlashCommand.turnPage repository))
-            Refresh.run context |> ignore
+            let settings () = context.Configuration.Current.Courses
 
             let guild () =
                 context.Client.GetGuild context.GuildId :> IGuild
 
-            return [ SlashCommand.command repository guild home ]
+            let worker =
+                Worker.start (fun (describe: string, _) -> describe) (fun (_, work: unit -> Task) -> work ())
+
+            let queue describe work = worker.Post(describe, work)
+
+            context.Client.add_AutocompleteExecuted (
+                Func<SocketAutocompleteInteraction, Task>(
+                    SlashCommand.autocomplete repository (fun () -> settings().HomeFaculty)
+                )
+            )
+
+            context.Client.add_ButtonExecuted (Func<SocketMessageComponent, Task>(SlashCommand.turnPage repository))
+
+            context.Client.add_ButtonExecuted (
+                Func<SocketMessageComponent, Task>(MemberCommand.onButton repository guild settings queue)
+            )
+
+            Refresh.run context |> ignore
+
+            return
+                [
+                    SlashCommand.command repository guild settings queue
+                    MemberCommand.command repository guild settings queue
+                ]
         }
