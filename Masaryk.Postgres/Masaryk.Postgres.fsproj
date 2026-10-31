@@ -14,6 +14,7 @@
         <Compile Include="CourseRepository.fs"/>
         <Compile Include="ConfigurationRepository.fs"/>
         <Compile Include="LockoutRepository.fs"/>
+        <Compile Include="JobRepository.fs"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -37,6 +38,7 @@
         <EmbeddedResource Include="Migrations/014_lockout_overwrites.sql" />
         <EmbeddedResource Include="Migrations/015_course_members.sql" />
         <EmbeddedResource Include="Migrations/016_course_prune.sql" />
+        <EmbeddedResource Include="Migrations/017_scheduled_jobs.sql" />
         <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 

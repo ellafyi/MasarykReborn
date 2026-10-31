@@ -47,7 +47,8 @@ let start: Feature =
 
             context.Client.add_UserLeft (Func<SocketGuild, SocketUser, Task>(left))
 
-            Refresh.run context |> ignore
+            let jobs = JobRepository(context.Database)
+            Refresh.run context jobs |> ignore
 
             let server () = context.Client.GetGuild context.GuildId
 
@@ -56,17 +57,27 @@ let start: Feature =
 
             let cleanup () : Task =
                 task {
-                    // Gives the member list time to load, so members who left can be told apart.
-                    do! Task.Delay(TimeSpan.FromMinutes 10.0)
+                    // Members who left can only be told apart once the member list has loaded.
+                    let mutable waited = 0
 
-                    while true do
-                        queue "Daily course cleanup" (fun () ->
-                            Prune.daily context repository (settings ()) (server ()))
+                    while (isNull (server ()) || not (server ()).HasAllMembers) && waited < 60 do
+                        do! Task.Delay(TimeSpan.FromSeconds 10.0)
+                        waited <- waited + 1
 
-                        do! Task.Delay(TimeSpan.FromDays 1.0)
+                    let finished = TaskCompletionSource()
+
+                    queue "Daily course cleanup" (fun () ->
+                        task {
+                            try
+                                do! Prune.daily context repository (settings ()) (server ())
+                            finally
+                                finished.SetResult()
+                        })
+
+                    do! finished.Task
                 }
 
-            cleanup () |> ignore
+            Schedule.daily jobs "Course cleanup" (TimeOnly(4, 30)) cleanup |> ignore
 
             return
                 [

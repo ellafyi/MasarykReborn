@@ -1,4 +1,4 @@
-/// Keeps the course catalog current: a minute after the bot starts, then once a day.
+/// Keeps the course catalog current, once a day at 04:00.
 module Masaryk.Core.Services.Courses.Refresh
 
 open System
@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Discord
 open Masaryk.Core
 open Masaryk.Core.Services
+open Masaryk.Core.Services.Shared
 open Masaryk.IS
 open Masaryk.Postgres
 
@@ -47,19 +48,14 @@ let private refresh (context: Context) (http: Net.Http.HttpClient) (credentials:
     }
 
 /// Runs forever. Off without the IS account.
-let run (context: Context) : Task =
+let run (context: Context) (jobs: JobRepository) : Task =
     task {
         match Prezentator.credentials () with
         | None -> printfn "Course catalog refresh is off: set IS_UCO and IS_PASSWORD to turn it on."
         | Some credentials ->
             use http = Prezentator.client ()
-            do! Task.Delay(TimeSpan.FromMinutes 1.0)
 
-            while true do
-                try
-                    do! refresh context http credentials
-                with error ->
-                    eprintfn $"Course catalog refresh failed: {error.GetBaseException().Message}"
-
-                do! Task.Delay(TimeSpan.FromDays 1.0)
+            do!
+                Schedule.daily jobs "Course catalog refresh" (TimeOnly(4, 0)) (fun () ->
+                    refresh context http credentials)
     }

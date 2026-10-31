@@ -18,6 +18,7 @@
         <Compile Include="Services\Shared\Paging.fs" />
         <Compile Include="Services\Shared\Period.fs" />
         <Compile Include="Services\Shared\Cooldown.fs" />
+        <Compile Include="Services\Shared\Schedule.fs" />
         <Compile Include="Services\Config.fs" />
         <Compile Include="Services\Starboard\Domain.fs" />
         <Compile Include="Services\Starboard\Evaluation.fs" />
