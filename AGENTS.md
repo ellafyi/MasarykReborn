@@ -46,6 +46,7 @@ docker compose logs -f masaryk.core
 ## Deployment
 
 - `compose.yaml` is for local development. `compose.portainer.yaml` is the Portainer stack: it builds from Git, takes variables from the Portainer UI, publishes no ports, and joins the external Docker network `masaryk` created by the model's stack. Deploy the model stack first.
+- Production follows the `production` branch, which only the `Deploy` workflow moves, to a pushed `v*` tag. Pushing `master` deploys nothing; never push `production` by hand.
 - Never publish Postgres or the model API on a public interface.
 
 ## Don't

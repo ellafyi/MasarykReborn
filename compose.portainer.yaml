@@ -1,4 +1,5 @@
-# Production stack for Portainer: Stacks > Add stack > Repository, compose path `compose.portainer.yaml`.
+# Production stack for Portainer: Stacks > Add stack > Repository, compose path `compose.portainer.yaml`,
+# reference `refs/heads/production`. Pushing a version tag moves that branch and redeploys (README, "Releasing").
 # Variables are set in the Portainer UI (there is no .env file).
 #
 # Deploy the inference stack (MasarykTraining) first: it creates the `masaryk` network

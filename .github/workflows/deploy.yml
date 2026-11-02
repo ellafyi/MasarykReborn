@@ -1,0 +1,28 @@
+# Deploys a version tag: moves the `production` branch, which the Portainer stack follows, to the
+# tag and calls the stack's webhook. Running it by hand on an older tag rolls production back.
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Forced, so a rollback can move the branch backwards.
+      - run: git push --force origin "$GITHUB_SHA:refs/heads/production"
+      - run: curl --fail --silent --show-error --request POST "$PORTAINER_WEBHOOK"
+        env:
+          PORTAINER_WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
