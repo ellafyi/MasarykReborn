@@ -89,6 +89,19 @@ Rules every feature follows:
 ## Deployment
 Production runs as a Portainer stack (but should just work through compose) next to the language model container: create a stack from this repository with compose path `compose.portainer.yaml`. It joins the `masaryk` Docker network created by the model's stack, and reads `BOT_TOKEN`, `GUILD_ID`, `POSTGRES_PASSWORD` and `LLM_API_KEY` from the stack's environment variables, plus `IS_UCO` and `IS_PASSWORD`, which turn on the daily course catalog refresh from IS.
 
+### Releasing
+
+Production runs a version tag, never `master` directly. Pushing a tag `v<year>.<month>.<n>` starts the `Deploy` workflow (`.github/workflows/deploy.yml`). It moves the `production` branch to the tag and calls the stack's Portainer webhook, and Portainer then rebuilds the stack from `production`:
+
+```shell
+git tag v2026.11.1
+git push origin v2026.11.1
+```
+
+To roll back, run the `Deploy` workflow by hand in GitHub Actions and pick the older tag under *Use workflow from*. Migrations aren't undone, so the older code has to work with the newer schema.
+
+One-time setup: in Portainer, set the stack's repository reference to `refs/heads/production`, turn on GitOps updates with the webhook mechanism, and save the webhook URL as the repository secret `PORTAINER_WEBHOOK`. Don't also add it as a GitHub repository webhook: that would redeploy on every push.
+
 ## Planned Features
 
 The plan is to eventually do everything the [old bot](https://github.com/zloutek1/MasarykBOT/tree/main/bot/cogs) did.
